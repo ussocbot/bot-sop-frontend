@@ -137,6 +137,15 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .detail-section h2 { display: flex; align-items: center; gap: 9px; margin: 0; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #f8fafc; font-size: 14px; }
 .detail-section__body { padding: 10px 16px; }
 .detail-section__body p, .detail-section__body li { line-height: 1.65; }
+.formatted-content .detail-section__body > :first-child, .expectation-item__body > :first-child { margin-top: 0; }
+.formatted-content .detail-section__body > :last-child, .expectation-item__body > :last-child { margin-bottom: 0; }
+.formatted-content h3, .formatted-content h4, .formatted-content h5, .expectation-item__body h3, .expectation-item__body h4, .expectation-item__body h5 { margin: 18px 0 7px; line-height: 1.3; }
+.formatted-content h3, .expectation-item__body h3 { font-size: 17px; }
+.formatted-content h4, .expectation-item__body h4 { font-size: 15px; }
+.formatted-content h5, .expectation-item__body h5 { font-size: 13px; }
+.formatted-content ul, .formatted-content ol, .expectation-item__body ul, .expectation-item__body ol { margin: 8px 0; padding-left: 24px; }
+.formatted-content a, .expectation-item__body a:not(.primary-action) { color: var(--blue-700); font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
+.formatted-content code, .expectation-item__body code { padding: 2px 5px; border: 1px solid #dce3ed; border-radius: 5px; color: #7c2d12; background: #f8fafc; font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .detail-link-list { display: grid; }
 .detail-link-list > a, .detail-link-list > button, .detail-link-list__unavailable { display: grid; grid-template-columns: 1fr 18px; gap: 10px; align-items: center; width: 100%; padding: 13px 16px; border: 0; border-bottom: 1px solid #edf1f7; color: var(--ink); background: #fff; text-align: left; text-decoration: none; cursor: pointer; }
 .detail-link-list > a:last-child, .detail-link-list > button:last-child, .detail-link-list__unavailable:last-child { border-bottom: 0; }

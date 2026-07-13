@@ -122,7 +122,7 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
           <div><p>${window.BOTSOP_UI.escape(item.baseSection)}</p><h1>${window.BOTSOP_UI.escape(item.title)}</h1><span>${window.BOTSOP_UI.escape(item.summary || item.description || "")}</span></div>
         </header>
         <div class="record-meta">${meta}</div>
-        ${window.BOTSOP_UI.detailSection("Instructions", "clipboard-list", item.instruction)}
+        ${window.BOTSOP_UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
         ${window.BOTSOP_UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${window.BOTSOP_UI.imageGallery(item.screenshots)}
         ${window.BOTSOP_UI.relatedResourceLinks(item.relatedResources)}

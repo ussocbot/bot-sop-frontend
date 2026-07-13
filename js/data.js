@@ -123,6 +123,22 @@ window.navigationItems = [];
     return textValue(value);
   }
 
+  function richTextValue(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return value;
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) return value.map(richTextValue).join("");
+    if (typeof value !== "object") return "";
+
+    let text = richTextValue(value.text ?? value.name ?? value.value ?? "");
+    const link = urlValue(value.link ?? value.url ?? value.href ?? "");
+    const style = value.style || value.text_style || value.textStyle || {};
+    if (style.bold || value.bold) text = `**${text}**`;
+    if (style.italic || value.italic) text = `*${text}*`;
+    if (link && /^https?:\/\//i.test(link)) return `[${text || link}](${link})`;
+    return text;
+  }
+
   function relationNames(value) {
     if (!value) return [];
     if (!Array.isArray(value)) return listValue(value);
@@ -231,7 +247,7 @@ window.navigationItems = [];
     if (usedIds.has(id)) id = `${id}-${String(record.record_id || index).slice(-6)}`;
     usedIds.add(id);
 
-    const instruction = textValue(findField(fields, ["Instruction", "Content", "Guidance"]));
+    const instruction = richTextValue(findField(fields, ["Instruction", "Content", "Guidance"]));
     const displayType = canonical(
       findField(fields, ["Display Type"]),
       DISPLAY_TYPES,
@@ -421,6 +437,7 @@ window.navigationItems = [];
     buildModel,
     textValue,
     urlValue,
+    richTextValue,
     listValue,
     relationIds,
     attachmentList,

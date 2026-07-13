@@ -25,6 +25,83 @@
     return safe.split(/\n{2,}/).map(block => `<p>${block.replace(/\n/g, "<br>")}</p>`).join("");
   };
 
+  UI.markdown = function markdown(value) {
+    const source = String(value ?? "").replace(/\r\n?/g, "\n");
+    if (!source.trim()) return "";
+
+    function inline(rawLine) {
+      const tokens = [];
+      const stash = html => {
+        const marker = `%%BOTFMT${tokens.length}%%`;
+        tokens.push(html);
+        return marker;
+      };
+      let line = rawLine;
+      line = line.replace(/`([^`\n]+)`/g, (_, code) => stash(`<code>${UI.escape(code)}</code>`));
+      line = line.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/gi, (_, label, url) =>
+        stash(`<a href="${UI.escape(url)}" target="_blank" rel="noopener noreferrer">${UI.escape(label)}</a>`)
+      );
+      line = line.replace(/https?:\/\/[^\s<]+/gi, rawUrl => {
+        const trailing = rawUrl.match(/[.,;:!?]+$/)?.[0] || "";
+        const url = trailing ? rawUrl.slice(0, -trailing.length) : rawUrl;
+        return `${stash(`<a href="${UI.escape(url)}" target="_blank" rel="noopener noreferrer">${UI.escape(url)}</a>`)}${UI.escape(trailing)}`;
+      });
+      line = UI.escape(line)
+        .replace(/\*\*\*([^*\n]+)\*\*\*/g, "<strong><em>$1</em></strong>")
+        .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+        .replace(/_([^_\n]+)_/g, "<em>$1</em>");
+      return line.replace(/%%BOTFMT(\d+)%%/g, (_, index) => tokens[Number(index)] || "");
+    }
+
+    const html = [];
+    let listType = "";
+    function closeList() {
+      if (listType) html.push(`</${listType}>`);
+      listType = "";
+    }
+
+    source.split("\n").forEach(line => {
+      if (!line.trim()) {
+        closeList();
+        return;
+      }
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) {
+        closeList();
+        const level = heading[1].length + 2;
+        html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+        return;
+      }
+      const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+      const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+      if (unordered || ordered) {
+        const desired = unordered ? "ul" : "ol";
+        if (listType !== desired) {
+          closeList();
+          listType = desired;
+          html.push(`<${desired}>`);
+        }
+        html.push(`<li>${inline((unordered || ordered)[1])}</li>`);
+        return;
+      }
+      closeList();
+      html.push(`<p>${inline(line)}</p>`);
+    });
+    closeList();
+    return html.join("");
+  };
+
+  UI.markdownSection = function markdownSection(title, iconName, value) {
+    if (!value) return "";
+    return `
+      <section class="detail-section formatted-content">
+        <h2>${UI.icon(iconName)} ${UI.escape(title)}</h2>
+        <div class="detail-section__body">${UI.markdown(value)}</div>
+      </section>
+    `;
+  };
+
   UI.actionAttributes = function actionAttributes(item) {
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
@@ -95,7 +172,7 @@
             <details class="expectation-item">
               <summary><strong>${UI.escape(item.title)}</strong>${UI.icon("chevron-down")}</summary>
               ${(item.instruction || item.url) ? `<div class="expectation-item__body">
-                ${item.instruction ? UI.textBlocks(item.instruction) : ""}
+                ${item.instruction ? UI.markdown(item.instruction) : ""}
                 ${item.url ? `<a class="primary-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open link")} ${UI.icon("arrow-up-right")}</a>` : ""}
               </div>` : ""}
             </details>
