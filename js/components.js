@@ -29,6 +29,9 @@
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
+    if (item.displayType === "Link") {
+      return `href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"`;
+    }
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
   };
 
@@ -41,12 +44,12 @@
         </header>
         <div class="side-card__items">
           ${items.length ? items.map(item => `
-            <a class="side-card__item" ${UI.actionAttributes(item)}>
+            <a class="side-card__item${item.displayType === "Link" && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
                 <strong>${UI.escape(item.title)}</strong>
                 ${item.summary || item.badge ? `<small>${UI.escape(item.badge || item.summary)}</small>` : ""}
               </span>
-              ${UI.icon(item.url ? "arrow-up-right" : "chevron-right")}
+              ${UI.icon(item.displayType === "Link" ? "arrow-up-right" : (item.url ? "arrow-up-right" : "chevron-right"))}
             </a>
           `).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
         </div>
