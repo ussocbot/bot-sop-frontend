@@ -1,62 +1,37 @@
-function navigate(recordId) {
-    const record = window.navigationItems.find(
-        item => item.id === recordId
-    );
+(function installNavigation() {
+  "use strict";
 
-    if (!record) {
-        console.error(`Record not found: ${recordId}`);
-        return;
-    }
+  window.buildLeftNavigation = function buildLeftNavigation() {
+    const nav = document.getElementById("left-navigation");
+    const model = window.baseModel;
+    if (!nav || !model) return;
 
-    const hasChildren = window.navigationItems.some(
-        item => item.parent === recordId
-    );
+    const callouts = model.section("Callout", "OOS Routing");
+    nav.innerHTML = `
+      <div class="nav-block">
+        <p class="nav-label">Request Types</p>
+        ${model.requestTypes.map(item => `
+          <button type="button" class="nav-item" data-section-id="${window.BOTSOP_UI.escape(item.id)}" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
+            ${window.BOTSOP_UI.icon(item.icon || "folder")}
+            <span>${window.BOTSOP_UI.escape(item.title)}</span>
+            ${window.BOTSOP_UI.icon("chevron-right")}
+          </button>
+        `).join("")}
+      </div>
+      <div class="nav-callouts">
+        ${callouts.map(item => `
+          <button type="button" class="nav-callout" onclick="showRecord('${window.BOTSOP_UI.escape(item.id)}')">
+            ${window.BOTSOP_UI.icon(item.icon || "route")}
+            <span><strong>${window.BOTSOP_UI.escape(item.title)}</strong><small>${window.BOTSOP_UI.escape(item.summary || "Open routing guidance")}</small></span>
+          </button>
+        `).join("")}
+      </div>
+    `;
+  };
 
-    window.appState.history.push({
-        view: window.appState.currentView,
-        section: window.appState.currentSection
+  window.setActiveNavigation = function setActiveNavigation(sectionId) {
+    document.querySelectorAll(".nav-item").forEach(item => {
+      item.classList.toggle("is-active", item.dataset.sectionId === sectionId);
     });
-
-    window.appState.currentSection = recordId;
-
-    if (hasChildren) {
-        window.appState.currentView = "section";
-        showSection(recordId);
-    } else {
-        window.appState.currentView = "record";
-        showRecord(recordId);
-    }
-
-    buildLeftNavigation();
-}
-
-function goBack() {
-    const previousLocation = window.appState.history.pop();
-
-    if (!previousLocation) {
-        goHome();
-        return;
-    }
-
-    window.appState.currentView = previousLocation.view;
-    window.appState.currentSection = previousLocation.section;
-
-    if (previousLocation.view === "home") {
-        showHome();
-    } else if (previousLocation.view === "section") {
-        showSection(previousLocation.section);
-    } else if (previousLocation.view === "record") {
-        showRecord(previousLocation.section);
-    }
-
-    buildLeftNavigation();
-}
-
-function goHome() {
-    window.appState.currentView = "home";
-    window.appState.currentSection = null;
-    window.appState.history = [];
-
-    showHome();
-    buildLeftNavigation();
-}
+  };
+})();
