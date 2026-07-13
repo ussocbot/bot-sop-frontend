@@ -35,7 +35,20 @@
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
   };
 
+  UI.itemBadge = function itemBadge(item) {
+    if (item.badge) return item.badge;
+    if (!item.publishDate) return "";
+    const raw = String(item.publishDate).trim();
+    const published = /^\d{10,13}$/.test(raw)
+      ? new Date(raw.length === 10 ? Number(raw) * 1000 : Number(raw))
+      : new Date(raw);
+    if (Number.isNaN(published.getTime())) return "";
+    const age = Date.now() - published.getTime();
+    return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000 ? "New" : "";
+  };
+
   UI.sidebarCard = function sidebarCard(title, iconName, items, tone) {
+    const showDescriptions = !["BOT Tools", "OPUS Links"].includes(title);
     return `
       <section class="side-card side-card--${UI.escape(tone)}">
         <header class="side-card__header">
@@ -43,15 +56,17 @@
           <small>${items.length} item${items.length === 1 ? "" : "s"}</small>
         </header>
         <div class="side-card__items">
-          ${items.length ? items.map(item => `
+          ${items.length ? items.map(item => {
+            const badge = UI.itemBadge(item);
+            return `
             <a class="side-card__item${["Link", "Tool"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
-                <strong>${UI.escape(item.title)}</strong>
-                ${item.summary || item.badge ? `<small>${UI.escape(item.badge || item.summary)}</small>` : ""}
+                <span class="side-card__title"><strong>${UI.escape(item.title)}</strong>${badge ? `<em class="side-card__badge">${UI.escape(badge)}</em>` : ""}</span>
+                ${showDescriptions && item.summary ? `<small>${UI.escape(item.summary)}</small>` : ""}
               </span>
               ${UI.icon(item.displayType === "Link" ? "arrow-up-right" : (item.url ? "arrow-up-right" : "chevron-right"))}
             </a>
-          `).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
+          `; }).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
         </div>
       </section>
     `;
@@ -61,11 +76,33 @@
     const rail = document.getElementById("right-rail");
     if (!rail) return;
     rail.innerHTML = [
-      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
-      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet"),
       UI.sidebarCard("Important News", "megaphone", model.section("News", "Important News"), "green"),
-      UI.sidebarCard("SOP Updates", "file-clock", model.section("SOP Update", "SOP Updates"), "orange")
+      UI.sidebarCard("SOP Updates", "file-clock", model.section("SOP Update", "SOP Updates"), "orange"),
+      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
+      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet")
     ].join("");
+  };
+
+  UI.expectationsSection = function expectationsSection(items) {
+    return `
+      <section class="home-strip home-strip--green expectations-strip">
+        <div class="home-strip__heading">
+          <span class="home-strip__icon">${UI.icon("clock-3")}</span>
+          <div><h2>BOT Expectations</h2><p>${items.length ? `${items.length} published item${items.length === 1 ? "" : "s"}` : "Nothing is mapped here yet."}</p></div>
+        </div>
+        <div class="home-strip__content">
+          ${items.map(item => `
+            <details class="expectation-item">
+              <summary><strong>${UI.escape(item.title)}</strong>${UI.icon("chevron-down")}</summary>
+              ${(item.instruction || item.url) ? `<div class="expectation-item__body">
+                ${item.instruction ? UI.textBlocks(item.instruction) : ""}
+                ${item.url ? `<a class="primary-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open link")} ${UI.icon("arrow-up-right")}</a>` : ""}
+              </div>` : ""}
+            </details>
+          `).join("")}
+        </div>
+      </section>
+    `;
   };
 
   UI.homeSection = function homeSection(title, iconName, items, tone) {

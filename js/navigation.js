@@ -20,20 +20,21 @@
         `).join("")}
       </div>
       <div class="nav-callouts">
-        ${callouts.map(item => `
-          <button type="button" class="nav-callout" onclick="showRecord('${window.BOTSOP_UI.escape(item.id)}')">
-            ${window.BOTSOP_UI.icon(item.icon || "route")}
-            <span><strong>${window.BOTSOP_UI.escape(item.title)}</strong><small>${window.BOTSOP_UI.escape(item.summary || "Open routing guidance")}</small></span>
-          </button>
-        `).join("")}
-        ${oosRoutes.length ? `
-          <section class="oos-route-card">
-            <header>${window.BOTSOP_UI.icon("route")}<strong>OOS Routing</strong></header>
+        ${(callouts.length || oosRoutes.length) ? `
+          <section class="side-card side-card--green oos-side-card">
+            <header class="side-card__header"><span>${window.BOTSOP_UI.icon("route")} OOS Routing</span><small>${callouts.length + oosRoutes.length} items</small></header>
+            <div class="side-card__items">
+              ${callouts.map(item => `
+                <a class="side-card__item" href="#" onclick="event.preventDefault(); showRecord('${window.BOTSOP_UI.escape(item.id)}')">
+                  <span><strong>${window.BOTSOP_UI.escape(item.title)}</strong></span>${window.BOTSOP_UI.icon("chevron-right")}
+                </a>
+              `).join("")}
             ${oosRoutes.map(item => item.url ? `
-              <a href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+              <a class="side-card__item" href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
                 <span>${window.BOTSOP_UI.escape(item.title)}</span>${window.BOTSOP_UI.icon("arrow-up-right")}
               </a>
-            ` : `<span class="oos-route-card__disabled"><span>${window.BOTSOP_UI.escape(item.title)}</span><small>URL required</small></span>`).join("")}
+            ` : `<a class="side-card__item is-disabled" href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"><span><strong>${window.BOTSOP_UI.escape(item.title)}</strong></span>${window.BOTSOP_UI.icon("arrow-up-right")}</a>`).join("")}
+            </div>
           </section>
         ` : ""}
       </div>

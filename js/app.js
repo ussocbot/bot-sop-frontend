@@ -39,7 +39,7 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
     renderAndRefresh(`
       <div class="page-stack">
         ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
-        ${window.BOTSOP_UI.homeSection("BOT Expectations", "clock-3", expectations, "green")}
+        ${window.BOTSOP_UI.expectationsSection(expectations)}
         ${window.BOTSOP_UI.homeSection("Best Practices", "sparkles", bestPractices, "blue")}
         ${window.BOTSOP_UI.requestTypeGrid(model.requestTypes)}
         ${window.BOTSOP_UI.homeSection("Wrap Up", "circle-check-big", wrapUp, "violet")}
@@ -127,9 +127,8 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
         ${window.BOTSOP_UI.imageGallery(item.screenshots)}
         ${window.BOTSOP_UI.relatedResourceLinks(item.relatedResources)}
         ${window.BOTSOP_UI.linkedTaskLinks(item.linkedTasks)}
-        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
-        ${window.BOTSOP_UI.detailSection("Ticket Tag Display", "tag", item.ticketTagDisplay)}
         ${window.BOTSOP_UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
+        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
         ${item.url ? `<a class="primary-action" href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${window.BOTSOP_UI.escape(item.ctaLabel)} ${window.BOTSOP_UI.icon("arrow-up-right")}</a>` : ""}
       </article>
     `);
