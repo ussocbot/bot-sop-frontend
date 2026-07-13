@@ -90,6 +90,8 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .side-card__header small { color: var(--muted); font-size: 10px; }
 .side-card__item { display: grid; grid-template-columns: 1fr 16px; gap: 10px; align-items: center; padding: 11px 14px; border-bottom: 1px solid #edf1f7; color: var(--ink); text-decoration: none; }
 .side-card__item:hover { background: #f8fbff; }
+.side-card__item.is-disabled { color: #94a3b8; background: #f8fafc; cursor: not-allowed; }
+.side-card__item.is-disabled:hover { background: #f8fafc; }
 .side-card__item span { display: grid; }
 .side-card__item strong { font-size: 11px; }
 .side-card__item small { margin-top: 2px; color: var(--muted); font-size: 10px; }
