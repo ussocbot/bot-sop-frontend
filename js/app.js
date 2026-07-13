@@ -94,6 +94,10 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
     const item = model?.find(recordId);
     if (!model || !item) return;
     if (item.displayType === "Request Type") return window.showSection(item.id, addToHistory);
+    if (item.displayType === "Link") {
+      if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
+      return;
+    }
     if (addToHistory) remember("record", item.id);
 
     const context = item.appearsIn[0];
