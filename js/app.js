@@ -94,7 +94,7 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
     const item = model?.find(recordId);
     if (!model || !item) return;
     if (item.displayType === "Request Type") return window.showSection(item.id, addToHistory);
-    if (item.displayType === "Link") {
+    if (["Link", "Tool"].includes(item.displayType)) {
       if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
       return;
     }
@@ -124,8 +124,9 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
         <div class="record-meta">${meta}</div>
         ${window.BOTSOP_UI.detailSection("Instructions", "clipboard-list", item.instruction)}
         ${window.BOTSOP_UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
-        ${window.BOTSOP_UI.detailSection("Related Resources", "link", item.relatedResources)}
-        ${window.BOTSOP_UI.detailSection("Linked Tasks", "list-checks", item.linkedTasks)}
+        ${window.BOTSOP_UI.imageGallery(item.screenshots)}
+        ${window.BOTSOP_UI.relatedResourceLinks(item.relatedResources)}
+        ${window.BOTSOP_UI.linkedTaskLinks(item.linkedTasks)}
         ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
         ${window.BOTSOP_UI.detailSection("Ticket Tag Display", "tag", item.ticketTagDisplay)}
         ${window.BOTSOP_UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
@@ -170,6 +171,7 @@ window.appState = { currentView: "home", currentSection: null, history: [] };
       await window.baseDataReady;
       window.buildLeftNavigation();
       window.BOTSOP_UI.renderRightRail(window.baseModel);
+      window.BOTSOP_UI.installImageViewer();
       window.showHome(false);
       configureSearch();
       const signedIn = document.getElementById("signed-in-user");

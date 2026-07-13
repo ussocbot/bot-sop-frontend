@@ -114,10 +114,58 @@ window.navigationItems = [];
     return text ? text.split(/[,\n]/).map(item => item.trim()).filter(Boolean) : [];
   }
 
+  function urlValue(value) {
+    if (!value) return "";
+    if (Array.isArray(value)) return urlValue(value[0]);
+    if (typeof value === "object") {
+      return textValue(value.link ?? value.url ?? value.href ?? value.text ?? "");
+    }
+    return textValue(value);
+  }
+
   function relationNames(value) {
     if (!value) return [];
     if (!Array.isArray(value)) return listValue(value);
     return value.map(item => textValue(item)).filter(Boolean);
+  }
+
+  function relationIds(value) {
+    const ids = new Set();
+    function visit(entry) {
+      if (!entry) return;
+      if (Array.isArray(entry)) return entry.forEach(visit);
+      if (typeof entry === "string") {
+        if (/^rec[A-Za-z0-9_-]+$/.test(entry)) ids.add(entry);
+        return;
+      }
+      if (typeof entry !== "object") return;
+      visit(entry.record_id);
+      visit(entry.recordId);
+      visit(entry.record_ids);
+      visit(entry.recordIds);
+      visit(entry.link_record_ids);
+      if (typeof entry.id === "string" && /^rec/.test(entry.id)) visit(entry.id);
+    }
+    visit(value);
+    return [...ids];
+  }
+
+  function attachmentList(value) {
+    const entries = Array.isArray(value) ? value : (value ? [value] : []);
+    return entries.map(entry => {
+      if (!entry || typeof entry !== "object") return null;
+      const fileToken = textValue(entry.file_token ?? entry.fileToken ?? entry.token);
+      const name = textValue(entry.name ?? entry.file_name ?? entry.fileName) || "Guidance image";
+      const mimeType = textValue(entry.type ?? entry.mime_type ?? entry.mimeType);
+      const looksLikeImage = mimeType.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+      if (!fileToken || !looksLikeImage) return null;
+      return {
+        fileToken,
+        name,
+        mimeType,
+        src: `/api/media?file_token=${encodeURIComponent(fileToken)}`
+      };
+    }).filter(Boolean);
   }
 
   function boolValue(value, fallback = true) {
@@ -194,6 +242,11 @@ window.navigationItems = [];
       BASE_SECTIONS,
       ""
     );
+    const rawScreenshotGuidance = findField(fields, ["Screenshot Guidance"]);
+    const rawScreenshots = findField(fields, ["Screenshots", "Attachments"]);
+    const rawRelatedResources = findField(fields, ["Related Resources"]);
+    const rawLinkedTasks = findField(fields, ["Linked Tasks"]);
+    const guidanceAttachments = attachmentList(rawScreenshotGuidance);
 
     const item = {
       id,
@@ -211,16 +264,20 @@ window.navigationItems = [];
       priority: numberValue(findField(fields, ["Priority"]), 0),
       status: textValue(findField(fields, ["Status"])) || "Active",
       published: boolValue(findField(fields, ["Published"]), true),
-      url: textValue(findField(fields, ["URL", "Link"])),
+      url: urlValue(findField(fields, ["URL", "Link"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open",
       badge: textValue(findField(fields, ["Badge"])),
       publishDate: textValue(findField(fields, ["Publish Date"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
       lastUpdated: textValue(findField(fields, ["Last Updated"])) || "Not available",
-      screenshotGuidance: textValue(findField(fields, ["Screenshot Guidance"])),
-      screenshots: findField(fields, ["Screenshots", "Attachments"]),
-      relatedResources: relationNames(findField(fields, ["Related Resources"])),
-      linkedTasks: relationNames(findField(fields, ["Linked Tasks"])),
+      screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
+      screenshots: [...attachmentList(rawScreenshots), ...guidanceAttachments],
+      relatedResourceIds: relationIds(rawRelatedResources),
+      linkedTaskIds: relationIds(rawLinkedTasks),
+      unresolvedRelatedResources: relationNames(rawRelatedResources).filter(name => !/^rec/.test(name)),
+      unresolvedLinkedTasks: relationNames(rawLinkedTasks).filter(name => !/^rec/.test(name)),
+      relatedResources: [],
+      linkedTasks: [],
       ticketTags: listValue(findField(fields, ["Ticket Tags"])),
       ticketTagDisplay: textValue(findField(fields, ["Ticket Tag Display"])),
       closingGuidance: textValue(findField(fields, ["Closing Guidance"])),
@@ -232,8 +289,35 @@ window.navigationItems = [];
     item.contractKey = `${item.displayType}|${item.baseSection}`;
     item.destination = SECTION_CONTRACT[item.contractKey] || "Unmapped";
     item.mappingValid = Boolean(SECTION_CONTRACT[item.contractKey]);
-    item.resourceCount = item.relatedResources.length;
+    item.resourceCount = item.relatedResourceIds.length || item.unresolvedRelatedResources.length;
     return item;
+  }
+
+  function mapDocumentationRecord(record, index) {
+    const fields = record.fields || {};
+    const title = textValue(findField(fields, [
+      "Content Name", "Documentation Name", "Resource Name", "Documentation", "Title", "Name"
+    ])) || `Documentation ${index + 1}`;
+    const summary = textValue(findField(fields, ["Summary", "Description"]));
+    return {
+      id: `documentation-${slugify(record.record_id || title)}`,
+      recordId: record.record_id || "",
+      recordKey: textValue(findField(fields, ["Record Key", "Slug"])) || `documentation-${slugify(title)}`,
+      title,
+      summary,
+      description: summary,
+      url: urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
+      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open",
+      icon: textValue(findField(fields, ["Icon Key", "Icon"])) || "link",
+      badge: textValue(findField(fields, ["Badge"])),
+      websitePlacements: listValue(findField(fields, ["Website Placement", "Website Placements"])),
+      sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
+      priority: numberValue(findField(fields, ["Priority"]), 0),
+      published: boolValue(findField(fields, ["Published"]), true),
+      displayType: "Link",
+      sourceType: "Documentation",
+      sopRecordIds: relationIds(findField(fields, ["SOP"]))
+    };
   }
 
   function buildRequestTypes(items) {
@@ -272,19 +356,44 @@ window.navigationItems = [];
     );
   }
 
-  function buildModel(records) {
+  function buildModel(records, documentationRecords = []) {
     const usedIds = new Set();
     const items = records.map((record, index) => mapRecord(record, index, usedIds));
     const publishedItems = items.filter(item => item.published);
+    const documents = documentationRecords.map(mapDocumentationRecord).filter(item => item.published);
+    const documentsByRecordId = new Map(documents.map(item => [item.recordId, item]));
+    const itemsByRecordId = new Map(publishedItems.map(item => [item.recordId, item]));
+
+    publishedItems.forEach(item => {
+      item.relatedResources = item.relatedResourceIds
+        .map(id => documentsByRecordId.get(id))
+        .filter(Boolean);
+      item.unresolvedRelatedResources.forEach(title => {
+        item.relatedResources.push({ title, url: "", unresolved: true });
+      });
+      item.linkedTasks = item.linkedTaskIds
+        .map(id => itemsByRecordId.get(id))
+        .filter(Boolean);
+      item.unresolvedLinkedTasks.forEach(title => {
+        item.linkedTasks.push({ title, unresolved: true });
+      });
+      item.resourceCount = item.relatedResources.length;
+    });
     const requestTypes = buildRequestTypes(publishedItems);
 
     return {
       items: publishedItems,
+      documents,
       requestTypes,
       unmapped: publishedItems.filter(item => !item.mappingValid),
       section(displayType, baseSection) {
         return publishedItems
           .filter(item => item.displayType === displayType && item.baseSection === baseSection)
+          .sort((a, b) => b.priority - a.priority || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+      },
+      documentsFor(placement) {
+        return documents
+          .filter(item => item.websitePlacements.some(value => normalizeKey(value) === normalizeKey(placement)))
           .sort((a, b) => b.priority - a.priority || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
       },
       processesFor(requestType) {
@@ -308,9 +417,13 @@ window.navigationItems = [];
     BASE_SECTIONS,
     SECTION_CONTRACT,
     mapRecord,
+    mapDocumentationRecord,
     buildModel,
     textValue,
+    urlValue,
     listValue,
+    relationIds,
+    attachmentList,
     slugify
   };
 
@@ -327,7 +440,7 @@ window.navigationItems = [];
     if (!response.ok) throw new Error(payload.error || "Unable to load Base records");
     if (!(payload.records || []).length) throw new Error("The configured Base view returned no records");
 
-    window.baseModel = buildModel(payload.records || []);
+    window.baseModel = buildModel(payload.records || [], payload.documentationRecords || []);
     window.navigationItems = [...window.baseModel.requestTypes, ...window.baseModel.items];
     window.baseMeta = payload.meta || {};
     return window.baseModel;

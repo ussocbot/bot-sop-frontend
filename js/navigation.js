@@ -7,6 +7,7 @@
     if (!nav || !model) return;
 
     const callouts = model.section("Callout", "OOS Routing");
+    const oosRoutes = model.documentsFor("OOS Routing");
     nav.innerHTML = `
       <div class="nav-block">
         <p class="nav-label">Request Types</p>
@@ -25,6 +26,16 @@
             <span><strong>${window.BOTSOP_UI.escape(item.title)}</strong><small>${window.BOTSOP_UI.escape(item.summary || "Open routing guidance")}</small></span>
           </button>
         `).join("")}
+        ${oosRoutes.length ? `
+          <section class="oos-route-card">
+            <header>${window.BOTSOP_UI.icon("route")}<strong>OOS Routing</strong></header>
+            ${oosRoutes.map(item => item.url ? `
+              <a href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+                <span>${window.BOTSOP_UI.escape(item.title)}</span>${window.BOTSOP_UI.icon("arrow-up-right")}
+              </a>
+            ` : `<span class="oos-route-card__disabled"><span>${window.BOTSOP_UI.escape(item.title)}</span><small>URL required</small></span>`).join("")}
+          </section>
+        ` : ""}
       </div>
     `;
   };

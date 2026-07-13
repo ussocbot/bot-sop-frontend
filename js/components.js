@@ -29,7 +29,7 @@
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
-    if (item.displayType === "Link") {
+    if (["Link", "Tool"].includes(item.displayType)) {
       return `href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"`;
     }
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
@@ -44,7 +44,7 @@
         </header>
         <div class="side-card__items">
           ${items.length ? items.map(item => `
-            <a class="side-card__item${item.displayType === "Link" && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
+            <a class="side-card__item${["Link", "Tool"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
                 <strong>${UI.escape(item.title)}</strong>
                 ${item.summary || item.badge ? `<small>${UI.escape(item.badge || item.summary)}</small>` : ""}
@@ -61,8 +61,8 @@
     const rail = document.getElementById("right-rail");
     if (!rail) return;
     rail.innerHTML = [
-      UI.sidebarCard("BOT Tools", "wrench", model.section("Tool", "BOT Tools"), "blue"),
-      UI.sidebarCard("OPUS Links", "link", model.section("Link", "OPUS Links"), "violet"),
+      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
+      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet"),
       UI.sidebarCard("Important News", "megaphone", model.section("News", "Important News"), "green"),
       UI.sidebarCard("SOP Updates", "file-clock", model.section("SOP Update", "SOP Updates"), "orange")
     ].join("");
@@ -151,5 +151,84 @@
         <div class="detail-section__body">${body}</div>
       </section>
     `;
+  };
+
+  UI.relatedResourceLinks = function relatedResourceLinks(items) {
+    if (!items?.length) return "";
+    return `
+      <section class="detail-section">
+        <h2>${UI.icon("link")} Related Resources</h2>
+        <div class="detail-link-list">
+          ${items.map(item => item.url ? `
+            <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+              <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong></span>${UI.icon("arrow-up-right")}
+            </a>
+          ` : `<span class="detail-link-list__unavailable">${UI.icon("unlink")}<strong>${UI.escape(item.title)}</strong><small>URL unavailable</small></span>`).join("")}
+        </div>
+      </section>
+    `;
+  };
+
+  UI.linkedTaskLinks = function linkedTaskLinks(items) {
+    if (!items?.length) return "";
+    return `
+      <section class="detail-section">
+        <h2>${UI.icon("list-checks")} Linked Tasks</h2>
+        <div class="detail-link-list">
+          ${items.map(item => item.id ? `
+            <button type="button" onclick="showRecord('${UI.escape(item.id)}')">
+              <span>${UI.icon("file-text")}<strong>${UI.escape(item.title)}</strong></span>${UI.icon("chevron-right")}
+            </button>
+          ` : `<span class="detail-link-list__unavailable">${UI.icon("file-question")}<strong>${UI.escape(item.title)}</strong><small>Entry unavailable</small></span>`).join("")}
+        </div>
+      </section>
+    `;
+  };
+
+  UI.imageGallery = function imageGallery(images) {
+    if (!images?.length) return "";
+    return `
+      <section class="detail-section">
+        <h2>${UI.icon("images")} Guidance Images</h2>
+        <div class="guidance-gallery">
+          ${images.map(image => `
+            <button type="button" data-src="${UI.escape(image.src)}" data-name="${UI.escape(image.name)}" onclick="openGuidanceImage(this.dataset.src, this.dataset.name)" aria-label="Open ${UI.escape(image.name)}">
+              <img src="${UI.escape(image.src)}" alt="${UI.escape(image.name)}" loading="lazy">
+              <span>${UI.escape(image.name)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </section>
+    `;
+  };
+
+  UI.installImageViewer = function installImageViewer() {
+    if (document.getElementById("guidance-image-viewer")) return;
+    document.body.insertAdjacentHTML("beforeend", `
+      <div id="guidance-image-viewer" class="image-viewer" hidden role="dialog" aria-modal="true" aria-label="Guidance image viewer">
+        <button type="button" class="image-viewer__backdrop" aria-label="Close image" onclick="closeGuidanceImage()"></button>
+        <div class="image-viewer__panel">
+          <header><strong id="guidance-image-title">Guidance image</strong><button type="button" onclick="closeGuidanceImage()" aria-label="Close image">${UI.icon("x")}</button></header>
+          <img id="guidance-image-full" alt="">
+        </div>
+      </div>
+    `);
+    window.openGuidanceImage = function openGuidanceImage(src, name) {
+      const viewer = document.getElementById("guidance-image-viewer");
+      const image = document.getElementById("guidance-image-full");
+      document.getElementById("guidance-image-title").textContent = name || "Guidance image";
+      image.src = src;
+      image.alt = name || "Guidance image";
+      viewer.hidden = false;
+      document.body.classList.add("has-modal");
+    };
+    window.closeGuidanceImage = function closeGuidanceImage() {
+      const viewer = document.getElementById("guidance-image-viewer");
+      if (viewer) viewer.hidden = true;
+      document.body.classList.remove("has-modal");
+    };
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") window.closeGuidanceImage();
+    });
   };
 })();
