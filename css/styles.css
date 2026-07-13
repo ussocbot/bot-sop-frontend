@@ -152,6 +152,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .detail-link-list > a:hover, .detail-link-list > button:hover { background: #f7faff; }
 .detail-link-list > a span, .detail-link-list > button span, .detail-link-list__unavailable { align-items: center; }
 .detail-link-list > a span, .detail-link-list > button span { display: flex; gap: 9px; }
+.detail-link-list .link-kind { margin-left: auto; padding: 2px 7px; border-radius: 999px; color: #64748b; background: #eef2f7; font-size: 9px; font-weight: 700; white-space: nowrap; }
 .detail-link-list__unavailable { grid-template-columns: 20px 1fr auto; color: #94a3b8; cursor: default; }
 .detail-link-list__unavailable small { font-size: 10px; }
 .guidance-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 16px; }

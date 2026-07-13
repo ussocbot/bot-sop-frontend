@@ -281,9 +281,11 @@ window.navigationItems = [];
       status: textValue(findField(fields, ["Status"])) || "Active",
       published: boolValue(findField(fields, ["Published"]), true),
       url: urlValue(findField(fields, ["URL", "Link"])),
-      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open",
+      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       badge: textValue(findField(fields, ["Badge"])),
       publishDate: textValue(findField(fields, ["Publish Date"])),
+      featuredIn: listValue(findField(fields, ["Featured In"])),
+      featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
       lastUpdated: textValue(findField(fields, ["Last Updated"])) || "Not available",
       screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
@@ -323,7 +325,7 @@ window.navigationItems = [];
       summary,
       description: summary,
       url: urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
-      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open",
+      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       icon: textValue(findField(fields, ["Icon Key", "Icon"])) || "link",
       badge: textValue(findField(fields, ["Badge"])),
       websitePlacements: listValue(findField(fields, ["Website Placement", "Website Placements"])),
@@ -342,9 +344,11 @@ window.navigationItems = [];
     items
       .filter(item => ["Process", "Process Group"].includes(item.displayType))
       .forEach(item => item.appearsIn.forEach(context => {
-        if (context && normalizeKey(context) !== "global") contexts.add(context);
+        if (context && !["global", "oos routing"].includes(normalizeKey(context))) contexts.add(context);
       }));
-    explicit.forEach(item => contexts.add(item.title));
+    explicit.forEach(item => {
+      if (normalizeKey(item.title) !== "oos routing") contexts.add(item.title);
+    });
 
     return [...contexts].map((title, index) => {
       const configured = explicit.find(item => normalizeKey(item.title) === normalizeKey(title));
@@ -411,6 +415,26 @@ window.navigationItems = [];
         return documents
           .filter(item => item.websitePlacements.some(value => normalizeKey(value) === normalizeKey(placement)))
           .sort((a, b) => b.priority - a.priority || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+      },
+      featuredFor(placement) {
+        const now = Date.now();
+        const featureWindow = 14 * 24 * 60 * 60 * 1000;
+        return publishedItems
+          .filter(item => item.featuredIn.some(value => normalizeKey(value) === normalizeKey(placement)))
+          .map(item => {
+            const raw = String(item.publishDate || "").trim();
+            const publishedAt = /^\d{10,13}$/.test(raw)
+              ? (raw.length === 10 ? Number(raw) * 1000 : Number(raw))
+              : Date.parse(raw);
+            return { item, publishedAt };
+          })
+          .filter(({ publishedAt }) => Number.isFinite(publishedAt) && now >= publishedAt && now - publishedAt <= featureWindow)
+          .sort((a, b) => b.publishedAt - a.publishedAt || a.item.sortOrder - b.item.sortOrder)
+          .map(({ item }) => ({
+            ...item,
+            isFeatured: true,
+            summary: item.featureSummary || item.summary
+          }));
       },
       processesFor(requestType) {
         return publishedItems

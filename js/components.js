@@ -103,6 +103,9 @@
   };
 
   UI.actionAttributes = function actionAttributes(item) {
+    if ((item.isFeatured || ["News", "SOP Update"].includes(item.displayType)) && item.id) {
+      return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
+    }
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
@@ -152,20 +155,21 @@
   UI.renderRightRail = function renderRightRail(model) {
     const rail = document.getElementById("right-rail");
     if (!rail) return;
+    const unique = items => [...new Map(items.map(item => [item.id, item])).values()];
     rail.innerHTML = [
-      UI.sidebarCard("Important News", "megaphone", model.section("News", "Important News"), "green"),
-      UI.sidebarCard("SOP Updates", "file-clock", model.section("SOP Update", "SOP Updates"), "orange"),
+      UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "green"),
+      UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "orange"),
       UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
       UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet")
     ].join("");
   };
 
-  UI.expectationsSection = function expectationsSection(items) {
+  UI.guidanceDropdownSection = function guidanceDropdownSection(title, iconName, items, tone) {
     return `
-      <section class="home-strip home-strip--green expectations-strip">
+      <section class="home-strip home-strip--${UI.escape(tone)} expectations-strip">
         <div class="home-strip__heading">
-          <span class="home-strip__icon">${UI.icon("clock-3")}</span>
-          <div><h2>BOT Expectations</h2><p>${items.length ? `${items.length} published item${items.length === 1 ? "" : "s"}` : "Nothing is mapped here yet."}</p></div>
+          <span class="home-strip__icon">${UI.icon(iconName)}</span>
+          <div><h2>${UI.escape(title)}</h2><p>${items.length ? `${items.length} published item${items.length === 1 ? "" : "s"}` : "Nothing is mapped here yet."}</p></div>
         </div>
         <div class="home-strip__content">
           ${items.map(item => `
@@ -173,13 +177,17 @@
               <summary><strong>${UI.escape(item.title)}</strong>${UI.icon("chevron-down")}</summary>
               ${(item.instruction || item.url) ? `<div class="expectation-item__body">
                 ${item.instruction ? UI.markdown(item.instruction) : ""}
-                ${item.url ? `<a class="primary-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open link")} ${UI.icon("arrow-up-right")}</a>` : ""}
+                ${item.url ? `<a class="primary-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
               </div>` : ""}
             </details>
           `).join("")}
         </div>
       </section>
     `;
+  };
+
+  UI.expectationsSection = function expectationsSection(items) {
+    return UI.guidanceDropdownSection("BOT Expectations", "clock-3", items, "green");
   };
 
   UI.homeSection = function homeSection(title, iconName, items, tone) {
@@ -292,6 +300,29 @@
           ${items.map(item => item.id ? `
             <button type="button" onclick="showRecord('${UI.escape(item.id)}')">
               <span>${UI.icon("file-text")}<strong>${UI.escape(item.title)}</strong></span>${UI.icon("chevron-right")}
+            </button>
+          ` : `<span class="detail-link-list__unavailable">${UI.icon("file-question")}<strong>${UI.escape(item.title)}</strong><small>Entry unavailable</small></span>`).join("")}
+        </div>
+      </section>
+    `;
+  };
+
+  UI.relatedItemsSection = function relatedItemsSection(resources, tasks) {
+    const relatedResources = resources || [];
+    const linkedTasks = tasks || [];
+    if (!relatedResources.length && !linkedTasks.length) return "";
+    return `
+      <section class="detail-section">
+        <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
+        <div class="detail-link-list">
+          ${relatedResources.map(item => item.url ? `
+            <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+              <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">Resource</small></span>${UI.icon("arrow-up-right")}
+            </a>
+          ` : `<span class="detail-link-list__unavailable">${UI.icon("unlink")}<strong>${UI.escape(item.title)}</strong><small>URL unavailable</small></span>`).join("")}
+          ${linkedTasks.map(item => item.id ? `
+            <button type="button" onclick="showRecord('${UI.escape(item.id)}')">
+              <span>${UI.icon("file-text")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
             </button>
           ` : `<span class="detail-link-list__unavailable">${UI.icon("file-question")}<strong>${UI.escape(item.title)}</strong><small>Entry unavailable</small></span>`).join("")}
         </div>
