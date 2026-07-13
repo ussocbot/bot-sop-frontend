@@ -16,8 +16,14 @@ async function readJson(response) {
   const body = await response.json().catch(() => ({}));
 
   if (!response.ok || (typeof body.code === "number" && body.code !== 0)) {
-    const error = new Error(body.msg || `Feishu request failed (${response.status})`);
+    const error = new Error(
+      body.error_description ||
+      body.msg ||
+      body.error ||
+      `Feishu request failed (${response.status})`
+    );
     error.status = response.status;
+    error.feishuCode = body.code || null;
     throw error;
   }
 
@@ -57,6 +63,7 @@ module.exports = async function callback(req, res) {
   if (!code) return res.status(400).json({ error: "Missing authorization code" });
 
   const apiOrigin = process.env.FEISHU_API_ORIGIN || "https://open.feishu.cn";
+  const redirectUri = `${appOrigin}/api/auth/callback`;
 
   try {
     const tokenResponse = await fetch(
@@ -68,7 +75,8 @@ module.exports = async function callback(req, res) {
           grant_type: "authorization_code",
           client_id: appId,
           client_secret: appSecret,
-          code
+          code,
+          redirect_uri: redirectUri
         })
       }
     );
@@ -105,7 +113,15 @@ module.exports = async function callback(req, res) {
     res.setHeader("Cache-Control", "no-store");
     res.redirect(302, `${appOrigin}/`);
   } catch (error) {
-    console.error("Feishu callback failed", error.message);
-    res.status(502).json({ error: "Unable to complete Feishu sign-in" });
+    console.error("Feishu callback failed", {
+      message: error.message,
+      status: error.status,
+      feishuCode: error.feishuCode
+    });
+    res.status(502).json({
+      error: "Unable to complete Feishu sign-in",
+      reason: error.message,
+      feishuCode: error.feishuCode || null
+    });
   }
 };
