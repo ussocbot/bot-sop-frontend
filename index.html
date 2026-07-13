@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>BOT SOP</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="header-brand__logo">
+                <img src="images/bot-icon.png" alt="">
+            </div>
+
+            <div class="header-brand__text">
+                <p class="header-brand__platform">
+                    Policy Enforcement Operations Center
+                </p>
+
+                <h1>BOT SOP</h1>
+
+                <p class="header-brand__subtitle">
+                    Operational guidance and workflows
+                </p>
+            </div>
+        </div>
+
+        <div class="header-search">
+            <input
+                type="search"
+                placeholder="Search the Operations Center..."
+                aria-label="Search the Operations Center"
+            >
+        </div>
+    </header>
+
+    <div class="container">
+        <aside class="left-sidebar">
+            <nav
+                id="left-navigation"
+                class="left-navigation"
+                aria-label="BOT SOP navigation"
+            ></nav>
+        </aside>
+
+        <main class="content">
+            <section id="content-view"></section>
+        </main>
+
+<aside class="right-sidebar">
+
+    <!-- Important News -->
+    <section class="sidebar-widget">
+
+        <div class="widget-header">
+            <h3>Important News</h3>
+            <button class="widget-link">View All</button>
+        </div>
+
+        <div class="widget-items">
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">Policy Update: Impersonation</span>
+                    <p>Policy</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">New Detection Released</span>
+                    <p>Detection</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">Maintenance Scheduled</span>
+                    <p>System</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+        </div>
+
+    </section>
+
+    <!-- See What's New -->
+    <section class="sidebar-widget">
+
+        <div class="widget-header">
+            <h3>See What's New</h3>
+            <button class="widget-link">View All</button>
+        </div>
+
+        <div class="widget-items">
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">New Account Appeal Workflow</span>
+                    <p>SOP Update</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">Tagging Requirements Updated</span>
+                    <p>Documentation</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+            <a href="#" class="widget-item">
+                <div>
+                    <span class="widget-title">Added New OPUS Resources</span>
+                    <p>Resources</p>
+                </div>
+                <span class="widget-arrow">›</span>
+            </a>
+
+        </div>
+
+    </section>
+    <!-- Recently Viewed -->
+<div id="recently-viewed-widget"></div>
+
+</aside>
+        </aside>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="js/data.js"></script>
+    <script src="js/components.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
