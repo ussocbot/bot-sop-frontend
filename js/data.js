@@ -57,14 +57,56 @@ window.navigationItems = [];
     return text.length > 180 ? `${text.slice(0, 177)}...` : text;
   }
 
+  const requestTypeDefinitions = {
+    "video/photo post": { title: "Video / Photo Post", icon: "🎬", order: 1 },
+    "video / photo post": { title: "Video / Photo Post", icon: "🎬", order: 1 },
+    "account": { title: "Account", icon: "👤", order: 2 },
+    "live": { title: "Live", icon: "📡", order: 3 },
+    "comment": { title: "Comment", icon: "💬", order: 4 },
+    "direct message": { title: "Direct Message", icon: "✉️", order: 5 },
+    "dm": { title: "Direct Message", icon: "✉️", order: 5 },
+    "live comment": { title: "Live Comment", icon: "💬", order: 6 },
+    "user profile": { title: "User Profile", icon: "👤", order: 7 },
+    "circumvention / recidivism": {
+      title: "Circumvention / Recidivism",
+      icon: "🛡️",
+      order: 8
+    },
+    "response wrap-up": { title: "Response Wrap-Up", icon: "✅", order: 9 },
+    "oos routing": { title: "OOS Routing", icon: "🔀", order: 10 }
+  };
+
+  function requestType(value) {
+    const suppliedTitle = textValue(value).replace(/\s+/g, " ").trim();
+    const key = suppliedTitle.toLowerCase();
+    const definition = requestTypeDefinitions[key];
+
+    return definition || {
+      title: suppliedTitle || "Other",
+      icon: "📁",
+      order: 1000
+    };
+  }
+
+  function parentTitle(value) {
+    let parent = value;
+
+    if (Array.isArray(parent)) parent = parent[0];
+    if (parent && typeof parent === "object") {
+      parent = parent.text ?? parent.name ?? parent.id ?? parent.record_id ?? "";
+    }
+
+    return textValue(parent);
+  }
+
   function mapRecords(records) {
     const usedIds = new Set();
 
-    const items = records.map((record, index) => {
+    const sourceItems = records.map((record, index) => {
       const fields = record.fields || {};
       const title = textValue(findField(fields, [
+        "Content Name",
         "Title",
-        "Customer Stories",
         "Name"
       ])) || `Record ${index + 1}`;
       const requestedId = slugify(
@@ -108,31 +150,91 @@ window.navigationItems = [];
       };
     });
 
-    const byRecordId = new Map(items.map(item => [item.recordId, item.id]));
-    const byTitle = new Map(
-      items.map(item => [item.title.trim().toLowerCase(), item.id])
-    );
+    const categoryByTitle = new Map();
+    const categories = [];
 
-    for (const item of items) {
-      let parentReference = item.rawParent;
+    for (const item of sourceItems) {
+      const requestedTypes = item.appearsIn.length
+        ? item.appearsIn
+        : [parentTitle(item.rawParent) || "Other"];
 
-      if (Array.isArray(parentReference)) parentReference = parentReference[0];
-      if (parentReference && typeof parentReference === "object") {
-        parentReference = parentReference.record_id ||
-          parentReference.id ||
-          parentReference.text ||
-          parentReference.name;
+      item.requestTypes = requestedTypes.map(requestType);
+
+      for (const definition of item.requestTypes) {
+        const key = definition.title.toLowerCase();
+        if (categoryByTitle.has(key)) continue;
+
+        const category = {
+          id: `request-${slugify(definition.title)}`,
+          title: definition.title,
+          icon: definition.icon,
+          description: `${definition.title} processes and operational guidance.`,
+          parent: null,
+          appearsIn: [definition.title],
+          sortOrder: definition.order,
+          displayType: "Request Type",
+          synthetic: true
+        };
+
+        categoryByTitle.set(key, category);
+        categories.push(category);
       }
-
-      const parentText = textValue(parentReference);
-      item.parent = byRecordId.get(parentText) ||
-        byTitle.get(parentText.toLowerCase()) ||
-        null;
-      item.resourceCount = listValue(item.relatedResources).length;
-      delete item.rawParent;
     }
 
-    return items;
+    const groupsByKey = new Map();
+    const groups = [];
+    const leaves = [];
+
+    for (const item of sourceItems) {
+      const configuredParent = parentTitle(item.rawParent);
+
+      item.requestTypes.forEach((definition, placementIndex) => {
+        const category = categoryByTitle.get(definition.title.toLowerCase());
+        const parentMatchesCategory = configuredParent &&
+          requestType(configuredParent).title.toLowerCase() ===
+            definition.title.toLowerCase();
+        let navigationParent = category.id;
+
+        if (configuredParent && !parentMatchesCategory) {
+          const groupKey = `${category.id}|${configuredParent.toLowerCase()}`;
+          let group = groupsByKey.get(groupKey);
+
+          if (!group) {
+            group = {
+              id: `group-${slugify(definition.title)}-${slugify(configuredParent)}`,
+              title: configuredParent,
+              icon: "📂",
+              description: `${configuredParent} guidance for ${definition.title}.`,
+              parent: category.id,
+              appearsIn: [definition.title],
+              sortOrder: item.sortOrder,
+              displayType: "Process Group",
+              synthetic: true
+            };
+            groupsByKey.set(groupKey, group);
+            groups.push(group);
+          } else {
+            group.sortOrder = Math.min(group.sortOrder, item.sortOrder);
+          }
+
+          navigationParent = group.id;
+        }
+
+        leaves.push({
+          ...item,
+          id: `${item.id}--${slugify(definition.title)}-${placementIndex + 1}`,
+          parent: navigationParent,
+          placement: definition.title,
+          resourceCount: listValue(item.relatedResources).length
+        });
+      });
+    }
+
+    categories.sort((left, right) =>
+      left.sortOrder - right.sortOrder || left.title.localeCompare(right.title)
+    );
+
+    return [...categories, ...groups, ...leaves];
   }
 
   function escapeHtml(value) {
