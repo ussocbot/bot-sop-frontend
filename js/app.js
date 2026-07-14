@@ -289,55 +289,16 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
   }
 function configureAgentAssistant() {
   const assistant = document.getElementById("agent-assistant");
-  const fallbackUrl = window.baseMeta?.agentAssistantUrl;
 
-  if (!assistant || !fallbackUrl) return;
+  if (!assistant) return;
 
-  assistant.href = fallbackUrl;
+  assistant.href =
+    "https://applink.feishu.cn/client/bot/open" +
+    "?appId=cli_aaba0414f1b91bd7";
+
+  assistant.target = "_blank";
+  assistant.rel = "noopener noreferrer";
   assistant.hidden = false;
-
-  assistant.addEventListener("click", event => {
-    const larkSdkAvailable =
-      window.tt &&
-      typeof window.tt.ready === "function" &&
-      typeof window.tt.openChat === "function";
-
-    if (!larkSdkAvailable) {
-      return;
-    }
-
-    event.preventDefault();
-
-    let fallbackStarted = false;
-
-    const useFallback = () => {
-      if (fallbackStarted) return;
-      fallbackStarted = true;
-      window.location.assign(fallbackUrl);
-    };
-
-    const readyTimeout = window.setTimeout(useFallback, 1500);
-
-    try {
-      window.tt.ready(() => {
-        window.clearTimeout(readyTimeout);
-
-        try {
-          window.tt.openChat({
-            appId: "cli_aaba0414f1b91bd7",
-            fail: useFallback
-          });
-        } catch (error) {
-          console.warn("Unable to open the native Lark bot chat", error);
-          useFallback();
-        }
-      });
-    } catch (error) {
-      window.clearTimeout(readyTimeout);
-      console.warn("Lark SDK was not ready", error);
-      useFallback();
-    }
-  });
 }
   async function initializeApp() {
     try {
