@@ -8,11 +8,85 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
   }
 
   function renderAndRefresh(html) {
-    const target = contentView();
-    if (!target) return;
-    target.innerHTML = html;
-    window.BOTSOP_UI.refreshIcons();
-  }
+  const target = contentView();
+  if (!target) return;
+
+  target.innerHTML = html;
+
+  target
+    .querySelectorAll("details[data-accordion-group]")
+    .forEach(details => {
+      details.addEventListener("toggle", () => {
+        if (!details.open) return;
+
+        const group = details.dataset.accordionGroup;
+
+        target
+          .querySelectorAll(
+            `details[data-accordion-group="${group}"][open]`
+          )
+          .forEach(other => {
+            if (other !== details) {
+              other.open = false;
+            }
+          });
+      });
+    });
+
+  window.BOTSOP_UI.refreshIcons();
+}
+
+function placementKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s*\/\s*/g, "/")
+    .replace(/\s+/g, " ");
+}
+
+function appearsIn(item, placement) {
+  const wanted = placementKey(placement);
+
+  return (item.appearsIn || []).some(
+    value => placementKey(value) === wanted
+  );
+}
+
+function guidanceItemsFor(placement) {
+  const supportedTypes = new Set([
+    "Process",
+    "Section",
+    "Checklist",
+    "Checklist Step"
+  ]);
+
+  const wanted = placementKey(placement);
+
+  return (window.baseModel?.items || [])
+    .filter(item => supportedTypes.has(item.displayType))
+    .filter(item =>
+      placementKey(item.baseSection) === wanted ||
+      appearsIn(item, placement)
+    )
+    .sort((a, b) =>
+      (b.priority || 0) - (a.priority || 0) ||
+      a.sortOrder - b.sortOrder ||
+      a.title.localeCompare(b.title)
+    );
+}
+
+function processAccordionList(items) {
+  return `
+    <div class="process-list">
+      ${items.map(item =>
+        window.BOTSOP_UI.processAccordion(
+          item,
+          favoriteButton(item)
+        )
+      ).join("")}
+    </div>
+  `;
+}
 
   function remember(view, id, query = "") {
     const previous = {
@@ -37,15 +111,69 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
     return `<button type="button" class="favorite-button${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')">${window.BOTSOP_UI.icon(active ? "star" : "star")} ${active ? "Remove from Favorites" : "Add to Favorites"}</button>`;
   }
 
-  window.showHome = function showHome(addToHistory = true) {
-    const model = window.baseModel;
-    if (!model) return;
-    if (addToHistory) remember("home", null);
-    else {
-      window.appState.currentView = "home";
-      window.appState.currentSection = null;
-      window.appState.currentQuery = "";
-    }
+window.showHome = function showHome(addToHistory = true) {
+  const model = window.baseModel;
+  if (!model) return;
+
+  if (addToHistory) {
+    remember("home", null);
+  } else {
+    window.appState.currentView = "home";
+    window.appState.currentSection = null;
+    window.appState.currentQuery = "";
+  }
+
+  window.setActiveNavigation(null);
+
+  const searchInput =
+    document.querySelector(".header-search input");
+
+  if (searchInput) {
+    searchInput.value = "";
+  }
+
+  const expectations =
+    guidanceItemsFor("BOT Expectations");
+
+  const bestPractices =
+    guidanceItemsFor("Best Practices");
+
+  const wrapUp =
+    guidanceItemsFor("Wrap Up");
+
+  const warnings =
+    model.section("Warning", "Policy Reminders");
+
+  renderAndRefresh(`
+    <div class="page-stack">
+      ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
+
+      ${window.BOTSOP_UI.updatesCallout(
+        window.baseMeta?.unacknowledgedUpdatesUrl
+      )}
+
+      ${window.BOTSOP_UI.expectationsSection(
+        expectations
+      )}
+
+      ${window.BOTSOP_UI.guidanceDropdownSection(
+        "Best Practices",
+        "sparkles",
+        bestPractices,
+        "blue"
+      )}
+
+      ${window.BOTSOP_UI.guidanceDropdownSection(
+        "Wrap Up",
+        "circle-check-big",
+        wrapUp,
+        "violet"
+      )}
+
+      ${window.BOTSOP_UI.warningCards(warnings)}
+    </div>
+  `);
+};
     window.setActiveNavigation(null);
     const searchInput = document.querySelector(".header-search input");
     if (searchInput) searchInput.value = "";
@@ -68,46 +196,196 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
     `);
   };
 
-  window.showSection = function showSection(sectionId, addToHistory = true) {
-    const model = window.baseModel;
-    const requestType = model?.requestTypes.find(item => item.id === sectionId || item.recordKey === sectionId);
-    if (!model || !requestType) return;
-    if (addToHistory) remember("section", requestType.id);
-    window.setActiveNavigation(requestType.id);
+window.showSection = function showSection(
+  sectionId,
+  addToHistory = true
+) {
+  const model = window.baseModel;
 
-    const allItems = model.processesFor(requestType.title);
-    const groups = allItems.filter(item => item.displayType === "Process Group");
-    const processes = allItems.filter(item => item.displayType === "Process");
-    const groupedNames = new Set(groups.map(group => group.title.toLowerCase()));
-    const ungrouped = processes.filter(item =>
-      !item.parents.some(parent => groupedNames.has(parent.toLowerCase()))
+  const requestType = model?.requestTypes.find(
+    item =>
+      item.id === sectionId ||
+      item.recordKey === sectionId
+  );
+
+  if (!model || !requestType) return;
+
+  if (addToHistory) {
+    remember("section", requestType.id);
+  } else {
+    window.appState.currentView = "section";
+    window.appState.currentSection = requestType.id;
+    window.appState.currentQuery = "";
+  }
+
+  window.setActiveNavigation(requestType.id);
+
+  const supportedTypes = new Set([
+    "Process",
+    "Process Group",
+    "Section",
+    "Checklist",
+    "Checklist Step"
+  ]);
+
+  const allItems = model.items
+    .filter(item =>
+      supportedTypes.has(item.displayType) &&
+      appearsIn(item, requestType.title)
+    )
+    .sort((a, b) =>
+      a.sortOrder - b.sortOrder ||
+      a.title.localeCompare(b.title)
     );
 
-    const groupSections = groups.map(group => {
+  const groups = allItems.filter(
+    item => item.displayType === "Process Group"
+  );
+
+  const processes = allItems.filter(
+    item => item.displayType !== "Process Group"
+  );
+
+  const groupedNames = new Set(
+    groups.map(group => placementKey(group.title))
+  );
+
+  const ungrouped = processes.filter(item =>
+    !(item.parents || []).some(parent =>
+      groupedNames.has(placementKey(parent))
+    )
+  );
+
+  const groupSections = groups
+    .map(group => {
       const children = processes.filter(item =>
-        item.parents.some(parent => parent.toLowerCase() === group.title.toLowerCase())
+        (item.parents || []).some(
+          parent =>
+            placementKey(parent) ===
+            placementKey(group.title)
+        )
       );
+
+      if (!children.length) return "";
+
       return `
         <section class="process-group">
-          <header><span>${window.BOTSOP_UI.icon(group.icon || "folders")}</span><div><h2>${window.BOTSOP_UI.escape(group.title)}</h2><p>${window.BOTSOP_UI.escape(group.summary || group.description || "Related processes")}</p></div></header>
-          <div class="process-grid">${children.map(window.BOTSOP_UI.processCard).join("")}</div>
+          <header>
+            <span>
+              ${window.BOTSOP_UI.icon(
+                group.icon || "folders"
+              )}
+            </span>
+
+            <div>
+              <h2>
+                ${window.BOTSOP_UI.escape(group.title)}
+              </h2>
+
+              <p>
+                ${window.BOTSOP_UI.escape(
+                  group.summary ||
+                  group.description ||
+                  "Related processes"
+                )}
+              </p>
+            </div>
+          </header>
+
+          ${processAccordionList(children)}
         </section>
       `;
-    }).join("");
+    })
+    .join("");
 
-    renderAndRefresh(`
-      <div class="page-stack">
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>›</span><span>${window.BOTSOP_UI.escape(requestType.title)}</span></nav>
-        <header class="process-header">
-          <span class="process-header__icon">${window.BOTSOP_UI.icon(requestType.icon || "folder")}</span>
-          <div><p>Request Type</p><h1>${window.BOTSOP_UI.escape(requestType.title)}</h1><span>${window.BOTSOP_UI.escape(requestType.summary || requestType.description || "Operational guidance and workflows")}</span></div>
-        </header>
-        ${ungrouped.length ? `<section class="process-group"><header><div><h2>${window.BOTSOP_UI.escape(requestType.title)} Processes</h2><p>Select a process to view the full instructions.</p></div></header><div class="process-grid">${ungrouped.map(window.BOTSOP_UI.processCard).join("")}</div></section>` : ""}
-        ${groupSections}
-        ${!processes.length ? `<section class="empty-state"><h2>No processes mapped here</h2><p>Add this request type to a Process record's <strong>Appears In</strong> field.</p></section>` : ""}
-      </div>
-    `);
-  };
+  renderAndRefresh(`
+    <div class="page-stack">
+      <nav
+        class="breadcrumbs"
+        aria-label="Breadcrumb"
+      >
+        <button
+          type="button"
+          onclick="showHome()"
+        >
+          Home
+        </button>
+
+        <span>&rsaquo;</span>
+
+        <span>
+          ${window.BOTSOP_UI.escape(requestType.title)}
+        </span>
+      </nav>
+
+      <header class="process-header">
+        <span class="process-header__icon">
+          ${window.BOTSOP_UI.icon(
+            requestType.icon || "folder"
+          )}
+        </span>
+
+        <div>
+          <p>Request Type</p>
+
+          <h1>
+            ${window.BOTSOP_UI.escape(requestType.title)}
+          </h1>
+
+          <span>
+            ${window.BOTSOP_UI.escape(
+              requestType.summary ||
+              requestType.description ||
+              "Operational guidance and workflows"
+            )}
+          </span>
+        </div>
+      </header>
+
+      ${
+        ungrouped.length
+          ? `
+            <section class="process-group">
+              <header>
+                <div>
+                  <h2>
+                    ${window.BOTSOP_UI.escape(
+                      requestType.title
+                    )}
+                    Processes
+                  </h2>
+
+                  <p>
+                    Expand a process to view its complete guidance.
+                  </p>
+                </div>
+              </header>
+
+              ${processAccordionList(ungrouped)}
+            </section>
+          `
+          : ""
+      }
+
+      ${groupSections}
+
+      ${
+        !processes.length
+          ? `
+            <section class="empty-state">
+              <h2>No processes mapped here</h2>
+
+              <p>
+                Add this request type to a content
+                record’s <strong>Appears In</strong> field.
+              </p>
+            </section>
+          `
+          : ""
+      }
+    </div>
+  `);
+};
 
   window.showWrapUp = function showWrapUp(recordId, addToHistory = true) {
     const model = window.baseModel;
@@ -243,9 +521,26 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
       body: JSON.stringify({ recordId: item.recordId, recordType: item.sourceType === "Documentation" ? "Resource" : "SOP", title: item.title })
     });
     if (!response.ok) return window.alert("Unable to update favorites. Please try again.");
-    if (removing) window.appState.favorites.delete(key);
-    else window.appState.favorites.add(key);
-    window.showRecord(item.id, false);
+   if (removing) {
+  window.appState.favorites.delete(key);
+} else {
+  window.appState.favorites.add(key);
+}
+
+if (window.appState.currentView === "section") {
+  window.showSection(
+    window.appState.currentSection,
+    false
+  );
+} else if (window.appState.currentView === "home") {
+  window.showHome(false);
+} else if (
+  window.appState.currentView === "favorites"
+) {
+  window.showFavorites(false);
+} else {
+  window.showRecord(item.id, false);
+}
   };
 
   async function loadFavorites() {
