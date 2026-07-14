@@ -102,7 +102,7 @@ window.navigationItems = [];
     if (Array.isArray(value)) return value.map(textValue).filter(Boolean).join(", ");
     if (typeof value === "object") {
       return textValue(
-        value.text ?? value.name ?? value.link ?? value.url ?? value.id ?? value.record_id ?? ""
+        value.text ?? value.name ?? value.label ?? value.value ?? value.link ?? value.url ?? value.id ?? value.record_id ?? ""
       );
     }
     return "";
@@ -264,6 +264,16 @@ window.navigationItems = [];
     const rawLinkedTasks = findField(fields, ["Linked Tasks"]);
     const guidanceAttachments = attachmentList(rawScreenshotGuidance);
 
+    const featuredIn = listValue(findField(fields, [
+      "Featured In", "Feature In", "Featured Placement", "Feature Placement"
+    ]));
+    if (boolValue(findField(fields, [
+      "Featured in Important News", "Feature in Important News", "Featured Important News"
+    ]), false)) featuredIn.push("Important News");
+    if (boolValue(findField(fields, [
+      "Featured in SOP Updates", "Feature in SOP Updates", "Featured SOP Updates"
+    ]), false)) featuredIn.push("SOP Updates");
+
     const item = {
       id,
       recordId: record.record_id || "",
@@ -283,8 +293,8 @@ window.navigationItems = [];
       url: urlValue(findField(fields, ["URL", "Link"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       badge: textValue(findField(fields, ["Badge"])),
-      publishDate: textValue(findField(fields, ["Publish Date"])),
-      featuredIn: listValue(findField(fields, ["Featured In"])),
+      publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
+      featuredIn: [...new Set(featuredIn)],
       featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
       lastUpdated: textValue(findField(fields, ["Last Updated"])) || "Not available",
@@ -419,8 +429,11 @@ window.navigationItems = [];
       featuredFor(placement) {
         const now = Date.now();
         const featureWindow = 14 * 24 * 60 * 60 * 1000;
+        const placementAliases = normalizeKey(placement) === "important news"
+          ? new Set(["important news", "news"])
+          : new Set(["sop updates", "sop update"]);
         return publishedItems
-          .filter(item => item.featuredIn.some(value => normalizeKey(value) === normalizeKey(placement)))
+          .filter(item => item.featuredIn.some(value => placementAliases.has(normalizeKey(value))))
           .map(item => {
             const raw = String(item.publishDate || "").trim();
             const publishedAt = /^\d{10,13}$/.test(raw)
