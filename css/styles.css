@@ -186,7 +186,89 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .updates-callout p { color: var(--muted); margin: 0; }
 .updates-callout a { align-items: center; background: #fff; border: 1px solid #d7ad45; border-radius: 9px; color: #7d5200; display: inline-flex; font-weight: 700; gap: 6px; padding: 9px 12px; text-decoration: none; }
 .personal-nav { border-top: 1px solid rgba(255,255,255,.1); margin-top: 12px; padding-top: 12px; }
+.inline-content {
+  display: grid;
+  gap: 14px;
+}
 
+.inline-content__empty {
+  margin: 0;
+  color: var(--muted);
+}
+
+.inline-content > .favorite-button {
+  justify-self: start;
+}
+
+.process-list {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px 0;
+}
+
+.process-accordion {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.process-accordion summary {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 18px;
+  gap: 12px;
+  align-items: center;
+  min-height: 88px;
+  max-height: 96px;
+  padding: 13px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.process-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.process-accordion summary:hover {
+  background: #f8fbff;
+}
+
+.process-accordion__preview {
+  display: grid;
+  min-width: 0;
+}
+
+.process-accordion__preview strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.process-accordion__preview small {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.process-accordion__chevron {
+  transition: transform 0.18s ease;
+}
+
+.process-accordion[open]
+.process-accordion__chevron {
+  transform: rotate(180deg);
+}
+
+.process-accordion__body {
+  padding: 18px;
+  border-top: 1px solid var(--line);
+  background: #fbfdff;
+}
 @media (max-width: 1180px) {
   .app-layout { grid-template-columns: 230px minmax(0, 1fr); }
   .right-sidebar { position: static; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-left: 250px; }
