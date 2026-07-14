@@ -1,5 +1,5 @@
 const { readSession } = require("../lib/session");
-const { getTenantToken, fetchTableRecords } = require("../lib/feishu");
+const { getTenantToken, fetchTableRecords, fetchBotInfo } = require("../lib/feishu");
 
 module.exports = async function baseRecords(req, res) {
   if (req.method !== "GET") {
@@ -37,6 +37,11 @@ module.exports = async function baseRecords(req, res) {
         viewId: documentationViewId
       })
     ]);
+    const botInfo = await fetchBotInfo({ apiOrigin, tenantToken }).catch(() => null);
+    const appLinkOrigin = (process.env.FEISHU_APPLINK_ORIGIN || "https://applink.larksuite.com").replace(/\/$/, "");
+    const agentAssistantUrl = botInfo?.open_id
+      ? `${appLinkOrigin}/client/chat/open?openId=${encodeURIComponent(botInfo.open_id)}`
+      : "";
 
     return res.status(200).json({
       records,
@@ -44,7 +49,10 @@ module.exports = async function baseRecords(req, res) {
       meta: {
         count: records.length,
         documentationCount: documentationRecords.length,
-        signedInAs: session.name
+        signedInAs: session.name,
+        agentAssistantUrl,
+        unacknowledgedUpdatesUrl: process.env.UNACKNOWLEDGED_UPDATES_URL || "",
+        favoritesEnabled: Boolean(process.env.FEISHU_FAVORITES_TABLE_ID)
       }
     });
   } catch (error) {
