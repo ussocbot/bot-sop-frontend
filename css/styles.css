@@ -32,6 +32,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .header-search input { width: 100%; height: 46px; border: 0; outline: 0; color: #fff; background: transparent; }
 .header-search input::placeholder { color: #cbd9ed; }
 .header-actions { display: flex; align-items: center; gap: 14px; font-size: 12px; }
+.build-version { border: 1px solid rgba(255,255,255,.22); border-radius: 999px; color: rgba(255,255,255,.78); font-size: 11px; letter-spacing: .02em; padding: 4px 8px; white-space: nowrap; }
 .header-actions a { color: #d9e9ff; text-decoration: none; }
 .signed-in { display: flex; align-items: center; gap: 7px; max-width: 160px; }
 .signed-in span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
