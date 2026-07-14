@@ -287,7 +287,58 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
   function showStartupError(error) {
     renderAndRefresh(`<section class="empty-state"><h1>Unable to load BOT SOP</h1><p>${window.BOTSOP_UI.escape(error.message || error)}</p><button type="button" class="primary-action" onclick="window.location.reload()">Try again</button></section>`);
   }
+function configureAgentAssistant() {
+  const assistant = document.getElementById("agent-assistant");
+  const fallbackUrl = window.baseMeta?.agentAssistantUrl;
 
+  if (!assistant || !fallbackUrl) return;
+
+  assistant.href = fallbackUrl;
+  assistant.hidden = false;
+
+  assistant.addEventListener("click", event => {
+    const larkSdkAvailable =
+      window.tt &&
+      typeof window.tt.ready === "function" &&
+      typeof window.tt.openChat === "function";
+
+    if (!larkSdkAvailable) {
+      return;
+    }
+
+    event.preventDefault();
+
+    let fallbackStarted = false;
+
+    const useFallback = () => {
+      if (fallbackStarted) return;
+      fallbackStarted = true;
+      window.location.assign(fallbackUrl);
+    };
+
+    const readyTimeout = window.setTimeout(useFallback, 1500);
+
+    try {
+      window.tt.ready(() => {
+        window.clearTimeout(readyTimeout);
+
+        try {
+          window.tt.openChat({
+            appId: "cli_aaba0414f1b91bd7",
+            fail: useFallback
+          });
+        } catch (error) {
+          console.warn("Unable to open the native Lark bot chat", error);
+          useFallback();
+        }
+      });
+    } catch (error) {
+      window.clearTimeout(readyTimeout);
+      console.warn("Lark SDK was not ready", error);
+      useFallback();
+    }
+  });
+}
   async function initializeApp() {
     try {
       await window.baseDataReady;
@@ -299,11 +350,7 @@ window.appState = { currentView: "home", currentSection: null, currentQuery: "",
       installCombinedSearch();
       const signedIn = document.getElementById("signed-in-user");
       if (signedIn && window.baseMeta?.signedInAs) signedIn.textContent = window.baseMeta.signedInAs;
-      const assistant = document.getElementById("agent-assistant");
-      if (assistant && window.baseMeta?.agentAssistantUrl) {
-        assistant.href = window.baseMeta.agentAssistantUrl;
-        assistant.hidden = false;
-      }
+   configureAgentAssistant();
     } catch (error) {
       console.error("BOT SOP startup failed", error);
       showStartupError(error);
