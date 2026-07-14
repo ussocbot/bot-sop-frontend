@@ -164,27 +164,46 @@
     ].join("");
   };
 
-  UI.guidanceDropdownSection = function guidanceDropdownSection(title, iconName, items, tone) {
-    return `
-      <section class="home-strip home-strip--${UI.escape(tone)} expectations-strip">
-        <div class="home-strip__heading">
-          <span class="home-strip__icon">${UI.icon(iconName)}</span>
-          <div><h2>${UI.escape(title)}</h2><p>${items.length ? `${items.length} published item${items.length === 1 ? "" : "s"}` : "Nothing is mapped here yet."}</p></div>
+UI.guidanceDropdownSection = function guidanceDropdownSection(
+  title,
+  iconName,
+  items,
+  tone
+) {
+  return `
+    <section class="home-strip home-strip--${UI.escape(tone)} expectations-strip">
+      <div class="home-strip__heading">
+        <span class="home-strip__icon">${UI.icon(iconName)}</span>
+        <div>
+          <h2>${UI.escape(title)}</h2>
+          <p>${
+            items.length
+              ? `${items.length} published item${items.length === 1 ? "" : "s"}`
+              : "Nothing is mapped here yet."
+          }</p>
         </div>
-        <div class="home-strip__content">
-          ${items.map(item => `
-            <details class="expectation-item">
-              <summary><strong>${UI.escape(item.title)}</strong>${UI.icon("chevron-down")}</summary>
-              ${(item.instruction || item.url) ? `<div class="expectation-item__body">
-                ${item.instruction ? UI.markdown(item.instruction) : ""}
-                ${item.url ? `<a class="primary-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
-              </div>` : ""}
-            </details>
-          `).join("")}
-        </div>
-      </section>
-    `;
-  };
+      </div>
+
+      <div class="home-strip__content">
+        ${items.map(item => `
+          <details
+            class="expectation-item"
+            data-accordion-group="home-guidance"
+          >
+            <summary>
+              <strong>${UI.escape(item.title)}</strong>
+              ${UI.icon("chevron-down")}
+            </summary>
+
+            <div class="expectation-item__body">
+              ${UI.inlineContent(item)}
+            </div>
+          </details>
+        `).join("")}
+      </div>
+    </section>
+  `;
+};
 
   UI.expectationsSection = function expectationsSection(items) {
     return UI.guidanceDropdownSection("BOT Expectations", "clock-3", items, "green");
@@ -262,7 +281,45 @@
       </button>
     `;
   };
+UI.processAccordion = function processAccordion(
+  item,
+  favoriteHtml = ""
+) {
+  const kind =
+    item.sourceType === "Documentation"
+      ? "Resource"
+      : "SOP";
 
+  return `
+    <details
+      class="process-accordion"
+      data-accordion-group="process-guidance"
+    >
+      <summary>
+        <span class="process-card__icon">
+          ${UI.icon(item.icon || "file-text")}
+        </span>
+
+        <span class="process-accordion__preview">
+          <em class="content-kind">${kind}</em>
+          <strong>${UI.escape(item.title)}</strong>
+          <small>
+            ${UI.escape(item.description || "Open guidance")}
+          </small>
+        </span>
+
+        ${UI.icon(
+          "chevron-down",
+          "process-accordion__chevron"
+        )}
+      </summary>
+
+      <div class="process-accordion__body">
+        ${UI.inlineContent(item, favoriteHtml)}
+      </div>
+    </details>
+  `;
+};
   UI.updatesCallout = function updatesCallout(url) {
     if (!url) return "";
     return `
@@ -358,7 +415,81 @@
       </section>
     `;
   };
+UI.inlineContent = function inlineContent(
+  item,
+  favoriteHtml = ""
+) {
+  const hasContent =
+    item.instruction ||
+    item.screenshotGuidance ||
+    item.screenshots?.length ||
+    item.relatedResources?.length ||
+    item.linkedTasks?.length ||
+    item.closingGuidance ||
+    item.ticketTags?.length ||
+    item.url;
 
+  if (!hasContent && !favoriteHtml) {
+    return `
+      <p class="inline-content__empty">
+        No guidance has been added yet.
+      </p>
+    `;
+  }
+
+  return `
+    <div class="inline-content">
+      ${favoriteHtml}
+
+      ${UI.markdownSection(
+        "Instructions",
+        "clipboard-list",
+        item.instruction
+      )}
+
+      ${UI.detailSection(
+        "Screenshot Guidance",
+        "image",
+        item.screenshotGuidance
+      )}
+
+      ${UI.imageGallery(item.screenshots)}
+
+      ${UI.relatedItemsSection(
+        item.relatedResources,
+        item.linkedTasks
+      )}
+
+      ${UI.detailSection(
+        "Closing Guidance",
+        "message-square-check",
+        item.closingGuidance
+      )}
+
+      ${UI.detailSection(
+        "Ticket Tags",
+        "tags",
+        item.ticketTags
+      )}
+
+      ${
+        item.url
+          ? `
+            <a
+              class="primary-action"
+              href="${UI.escape(item.url)}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ${UI.escape(item.ctaLabel || "Open Resource")}
+              ${UI.icon("arrow-up-right")}
+            </a>
+          `
+          : ""
+      }
+    </div>
+  `;
+};
   UI.installImageViewer = function installImageViewer() {
     if (document.getElementById("guidance-image-viewer")) return;
     document.body.insertAdjacentHTML("beforeend", `
