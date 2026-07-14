@@ -253,12 +253,24 @@
   };
 
   UI.processCard = function processCard(item) {
+    const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
     return `
       <button type="button" class="process-card" onclick="showRecord('${UI.escape(item.id)}')">
         <span class="process-card__icon">${UI.icon(item.icon || "file-text")}</span>
-        <span><strong>${UI.escape(item.title)}</strong><small>${UI.escape(item.description || "Open process guidance")}</small></span>
+        <span><em class="content-kind">${kind}</em><strong>${UI.escape(item.title)}</strong><small>${UI.escape(item.description || "Open guidance")}</small></span>
         ${UI.icon("chevron-right")}
       </button>
+    `;
+  };
+
+  UI.updatesCallout = function updatesCallout(url) {
+    if (!url) return "";
+    return `
+      <section class="updates-callout">
+        <span>${UI.icon("mail-warning")}</span>
+        <div><h2>Check Your Unacknowledged Updates</h2><p>Review Important News or SOP Updates that may still need your acknowledgment.</p></div>
+        <a href="${UI.escape(url)}" target="_blank" rel="noopener noreferrer">View My Updates ${UI.icon("arrow-up-right")}</a>
+      </section>
     `;
   };
 
@@ -308,23 +320,23 @@
   };
 
   UI.relatedItemsSection = function relatedItemsSection(resources, tasks) {
-    const relatedResources = resources || [];
-    const linkedTasks = tasks || [];
+    const relatedResources = (resources || []).filter(item => item?.url);
+    const linkedTasks = (tasks || []).filter(item => item?.id && !item.unresolved);
     if (!relatedResources.length && !linkedTasks.length) return "";
     return `
       <section class="detail-section">
         <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
         <div class="detail-link-list">
-          ${relatedResources.map(item => item.url ? `
+          ${relatedResources.map(item => `
             <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
               <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">Resource</small></span>${UI.icon("arrow-up-right")}
             </a>
-          ` : `<span class="detail-link-list__unavailable">${UI.icon("unlink")}<strong>${UI.escape(item.title)}</strong><small>URL unavailable</small></span>`).join("")}
-          ${linkedTasks.map(item => item.id ? `
+          `).join("")}
+          ${linkedTasks.map(item => `
             <button type="button" onclick="showRecord('${UI.escape(item.id)}')">
               <span>${UI.icon("file-text")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
             </button>
-          ` : `<span class="detail-link-list__unavailable">${UI.icon("file-question")}<strong>${UI.escape(item.title)}</strong><small>Entry unavailable</small></span>`).join("")}
+          `).join("")}
         </div>
       </section>
     `;

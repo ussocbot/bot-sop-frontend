@@ -9,6 +9,7 @@ window.navigationItems = [];
     process: "Process",
     section: "Section",
     checklist: "Checklist",
+    "checklist step": "Checklist Step",
     callout: "Callout",
     tool: "Tool",
     link: "Link",
@@ -73,6 +74,7 @@ window.navigationItems = [];
     "Section|BOT Expectations": "BOT Expectations homepage section",
     "Section|Best Practices": "Best Practices homepage section",
     "Checklist|Wrap Up": "Wrap Up homepage section",
+    "Checklist Step|Wrap Up": "nested Wrap Up step",
     "Callout|OOS Routing": "left OOS Routing card",
     "Tool|BOT Tools": "right BOT Tools card",
     "Link|OPUS Links": "right OPUS Links card",
@@ -123,6 +125,32 @@ window.navigationItems = [];
     return textValue(value);
   }
 
+  function deepUrl(value, seen = new Set()) {
+    if (!value) return "";
+    if (typeof value === "string") {
+      const match = value.match(/https?:\/\/[^\s<>"]+/i);
+      return match ? match[0] : "";
+    }
+    if (typeof value !== "object" || seen.has(value)) return "";
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        const found = deepUrl(entry, seen);
+        if (found) return found;
+      }
+      return "";
+    }
+    for (const key of ["url", "href", "link", "web_url", "webUrl", "redirect_url", "redirectUrl"]) {
+      const found = deepUrl(value[key], seen);
+      if (found) return found;
+    }
+    for (const key of ["mention_doc", "mentionDoc", "document", "doc", "mention", "content"]) {
+      const found = deepUrl(value[key], seen);
+      if (found) return found;
+    }
+    return "";
+  }
+
   function richTextValue(value) {
     if (value === null || value === undefined) return "";
     if (typeof value === "string") return value;
@@ -130,8 +158,12 @@ window.navigationItems = [];
     if (Array.isArray(value)) return value.map(richTextValue).join("");
     if (typeof value !== "object") return "";
 
-    let text = richTextValue(value.text ?? value.name ?? value.value ?? "");
-    const link = urlValue(value.link ?? value.url ?? value.href ?? "");
+    const mention = value.mention_doc ?? value.mentionDoc ?? value.document ?? value.doc ?? value.mention ?? null;
+    let text = richTextValue(
+      value.text ?? value.name ?? value.title ?? value.label ??
+      mention?.text ?? mention?.name ?? mention?.title ?? value.value ?? value.content?.text ?? ""
+    );
+    const link = deepUrl(value);
     const style = value.style || value.text_style || value.textStyle || {};
     if (style.bold || value.bold) text = `**${text}**`;
     if (style.italic || value.italic) text = `*${text}*`;
@@ -229,6 +261,7 @@ window.navigationItems = [];
       Process: "file-text",
       Section: "info",
       Checklist: "circle-check-big",
+      "Checklist Step": "list-checks",
       Callout: "route",
       Tool: "wrench",
       Link: "link",
@@ -286,6 +319,7 @@ window.navigationItems = [];
       instruction,
       appearsIn: listValue(findField(fields, ["Appears In"])).map(canonicalRequestType),
       parents: relationNames(findField(fields, ["Parent"])),
+      parentIds: relationIds(findField(fields, ["Parent"])),
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
       status: textValue(findField(fields, ["Status"])) || "Active",
@@ -334,6 +368,7 @@ window.navigationItems = [];
       title,
       summary,
       description: summary,
+      instruction: richTextValue(findField(fields, ["Instruction", "Content", "Guidance", "Details"])),
       url: urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       icon: textValue(findField(fields, ["Icon Key", "Icon"])) || "link",
@@ -342,6 +377,12 @@ window.navigationItems = [];
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
       published: boolValue(findField(fields, ["Published"]), true),
+      status: textValue(findField(fields, ["Status"])) || "Active",
+      lastUpdated: textValue(findField(fields, ["Last Updated", "Updated"])) || "Not available",
+      appearsIn: [],
+      parents: [],
+      parentIds: [],
+      ticketTags: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
       displayType: "Link",
       sourceType: "Documentation",
       sopRecordIds: relationIds(findField(fields, ["SOP"]))
@@ -458,8 +499,37 @@ window.navigationItems = [];
           )
           .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
       },
+      wrapStepsFor(parent) {
+        return publishedItems
+          .filter(item => item.displayType === "Checklist Step" && item.baseSection === "Wrap Up")
+          .filter(item =>
+            item.parentIds.includes(parent.recordId) ||
+            item.parents.some(value => normalizeKey(value) === normalizeKey(parent.title))
+          )
+          .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+      },
+      search(query) {
+        const normalized = normalizeKey(query);
+        if (!normalized) return [];
+        return [...publishedItems, ...documents]
+          .filter(item => item.displayType !== "Request Type")
+          .map(item => {
+            const title = normalizeKey(item.title);
+            const haystack = normalizeKey([
+              item.title, item.summary, item.instruction,
+              ...(item.appearsIn || []), ...(item.ticketTags || []), ...(item.websitePlacements || [])
+            ].join(" "));
+            const score = title === normalized ? 100 : title.startsWith(normalized) ? 75 : title.includes(normalized) ? 50 : haystack.includes(normalized) ? 20 : 0;
+            return { item, score };
+          })
+          .filter(result => result.score > 0)
+          .sort((a, b) => b.score - a.score || a.item.title.localeCompare(b.item.title))
+          .slice(0, 50)
+          .map(result => result.item);
+      },
       find(id) {
         return publishedItems.find(item => item.id === id || item.recordKey === id) ||
+          documents.find(item => item.id === id || item.recordKey === id) ||
           requestTypes.find(item => item.id === id || item.recordKey === id);
       }
     };

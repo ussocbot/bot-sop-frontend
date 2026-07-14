@@ -8,10 +8,12 @@
 
     const callouts = model.section("Callout", "OOS Routing");
     const oosRoutes = model.documentsFor("OOS Routing");
+    const hiddenRequestTypes = new Set(["e-commerce", "ecommerce", "best practices"]);
+    const visibleRequestTypes = model.requestTypes.filter(item => !hiddenRequestTypes.has(item.title.trim().toLowerCase()));
     nav.innerHTML = `
       <div class="nav-block">
         <p class="nav-label">Request Types</p>
-        ${model.requestTypes.map(item => `
+        ${visibleRequestTypes.map(item => `
           <button type="button" class="nav-item" data-section-id="${window.BOTSOP_UI.escape(item.id)}" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
             ${window.BOTSOP_UI.icon(item.icon || "folder")}
             <span>${window.BOTSOP_UI.escape(item.title)}</span>
@@ -19,6 +21,14 @@
           </button>
         `).join("")}
       </div>
+      ${window.baseMeta?.favoritesEnabled ? `
+        <div class="nav-block personal-nav">
+          <p class="nav-label">Personal</p>
+          <button type="button" class="nav-item" data-section-id="favorites" onclick="showFavorites()">
+            ${window.BOTSOP_UI.icon("star")}<span>My Favorites</span>${window.BOTSOP_UI.icon("chevron-right")}
+          </button>
+        </div>
+      ` : ""}
       <div class="nav-callouts">
         ${(callouts.length || oosRoutes.length) ? `
           <section class="side-card side-card--green oos-side-card">
