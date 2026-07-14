@@ -113,6 +113,7 @@ function processAccordionList(items) {
 
 window.showHome = function showHome(addToHistory = true) {
   const model = window.baseModel;
+
   if (!model) return;
 
   if (addToHistory) {
@@ -146,7 +147,9 @@ window.showHome = function showHome(addToHistory = true) {
 
   renderAndRefresh(`
     <div class="page-stack">
-      ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
+      ${window.BOTSOP_UI.mappingAlert(
+        model.unmapped
+      )}
 
       ${window.BOTSOP_UI.updatesCallout(
         window.baseMeta?.unacknowledgedUpdatesUrl
@@ -170,32 +173,12 @@ window.showHome = function showHome(addToHistory = true) {
         "violet"
       )}
 
-      ${window.BOTSOP_UI.warningCards(warnings)}
+      ${window.BOTSOP_UI.warningCards(
+        warnings
+      )}
     </div>
   `);
 };
-    window.setActiveNavigation(null);
-    const searchInput = document.querySelector(".header-search input");
-    if (searchInput) searchInput.value = "";
-
-    const expectations = model.section("Section", "BOT Expectations");
-    const bestPractices = model.section("Section", "Best Practices");
-    const wrapUp = model.section("Checklist", "Wrap Up");
-    const warnings = model.section("Warning", "Policy Reminders");
-
-    renderAndRefresh(`
-      <div class="page-stack">
-        ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
-        ${window.BOTSOP_UI.updatesCallout(window.baseMeta?.unacknowledgedUpdatesUrl)}
-        ${window.BOTSOP_UI.expectationsSection(expectations)}
-        ${window.BOTSOP_UI.guidanceDropdownSection("Best Practices", "sparkles", bestPractices, "blue")}
-        ${window.BOTSOP_UI.requestTypeGrid(model.requestTypes)}
-        ${window.BOTSOP_UI.homeSection("Wrap Up", "circle-check-big", wrapUp, "violet")}
-        ${window.BOTSOP_UI.warningCards(warnings)}
-      </div>
-    `);
-  };
-
 window.showSection = function showSection(
   sectionId,
   addToHistory = true
