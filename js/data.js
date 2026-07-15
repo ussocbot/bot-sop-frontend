@@ -212,15 +212,28 @@ window.navigationItems = [];
       const mimeType = textValue(entry.type ?? entry.mime_type ?? entry.mimeType);
       const looksLikeImage = mimeType.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
       const directUrl = deepUrl(entry.tmp_url ?? entry.tmpUrl ?? entry.download_url ?? entry.downloadUrl ?? entry.url);
+      const rawExtra = entry.extra ?? entry.download_extra ?? entry.downloadExtra;
+      let extra = typeof rawExtra === "string"
+        ? rawExtra.trim()
+        : (rawExtra && typeof rawExtra === "object" ? JSON.stringify(rawExtra) : textValue(rawExtra));
+      if (!extra && directUrl) {
+        try {
+          extra = new URL(directUrl, window.location.origin).searchParams.get("extra") || "";
+        } catch (error) {
+          extra = "";
+        }
+      }
       if ((!fileToken && !directUrl) || !looksLikeImage) return null;
       const query = new URLSearchParams();
       if (fileToken) query.set("file_token", fileToken);
       if (name) query.set("name", name);
       if (mimeType) query.set("mime_type", mimeType);
+      if (extra) query.set("extra", extra);
       return {
         fileToken,
         name,
         mimeType,
+        extra,
         src: fileToken ? `/api/media?${query.toString()}` : directUrl
       };
     }).filter(Boolean);
@@ -636,3 +649,4 @@ window.navigationItems = [];
     return window.baseModel;
   });
 })();
+
