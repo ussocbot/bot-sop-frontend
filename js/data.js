@@ -332,7 +332,7 @@ window.navigationItems = [];
       displayType,
       baseSection,
       iconKey: textValue(findField(fields, ["Icon Key", "Icon"])),
-      summary: textValue(findField(fields, ["Summary", "Description"])),
+      summary: textValue(findField(fields, ["Content Summary", "Summary", "Description"])),
       instruction,
       appearsIn: listValue(findField(fields, ["Appears In"])).map(canonicalRequestType),
       parents: relationNames(findField(fields, ["Parent"])),
@@ -365,7 +365,7 @@ window.navigationItems = [];
       workflow: textValue(findField(fields, ["Workflow"])) || "BOT"
     };
 
-    item.description = item.summary || shortDescription(item.instruction);
+    item.description = item.summary;
     item.icon = getIcon(item);
     item.contractKey = `${item.displayType}|${item.baseSection}`;
     item.destination = SECTION_CONTRACT[item.contractKey] || "Unmapped";
@@ -379,7 +379,7 @@ window.navigationItems = [];
     const title = textValue(findField(fields, [
       "Content Name", "Documentation Name", "Resource Name", "Documentation", "Title", "Name"
     ])) || `Documentation ${index + 1}`;
-    const summary = textValue(findField(fields, ["Summary", "Description"]));
+    const summary = textValue(findField(fields, ["Content Summary", "Summary", "Description"]));
     const rawScreenshotGuidance = findField(fields, ["Screenshot Guidance"]);
     const guidanceAttachments = attachmentList(rawScreenshotGuidance);
     const item = {
