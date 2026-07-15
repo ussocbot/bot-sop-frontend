@@ -127,14 +127,16 @@
     return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000 ? "New" : "";
   };
 
-  UI.sidebarCard = function sidebarCard(title, iconName, items, tone) {
+  UI.sidebarCard = function sidebarCard(title, iconName, items, tone, collapsible = false) {
     const showDescriptions = !["BOT Tools", "OPUS Links", "QA Links"].includes(title);
+    const cardTag = collapsible ? "details" : "section";
+    const headerTag = collapsible ? "summary" : "header";
     return `
-      <section class="side-card side-card--${UI.escape(tone)}">
-        <header class="side-card__header">
+      <${cardTag} class="side-card side-card--${UI.escape(tone)}${collapsible ? " side-card--collapsible" : ""}"${collapsible ? ` data-right-card-accordion="utilities"` : ""}>
+        <${headerTag} class="side-card__header">
           <span>${UI.icon(iconName)} ${UI.escape(title)}</span>
-          <small>${items.length} item${items.length === 1 ? "" : "s"}</small>
-        </header>
+          <span class="side-card__header-meta"><small>${items.length} item${items.length === 1 ? "" : "s"}</small>${collapsible ? UI.icon("chevron-down", "side-card__chevron") : ""}</span>
+        </${headerTag}>
         <div class="side-card__items">
           ${items.length ? items.map(item => {
             const badge = UI.itemBadge(item);
@@ -148,7 +150,7 @@
             </a>
           `; }).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
         </div>
-      </section>
+      </${cardTag}>
     `;
   };
 
@@ -159,10 +161,18 @@
     rail.innerHTML = [
       UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "green"),
       UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "orange"),
-      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
-      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet"),
-      UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal")
+      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
+      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
+      UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal", true)
     ].join("");
+    rail.querySelectorAll("details[data-right-card-accordion]").forEach(card => {
+      card.addEventListener("toggle", () => {
+        if (!card.open) return;
+        rail.querySelectorAll("details[data-right-card-accordion][open]").forEach(other => {
+          if (other !== card) other.open = false;
+        });
+      });
+    });
   };
 
   UI.guidanceDropdownSection = function guidanceDropdownSection(title, iconName, items, tone, summaryText = "") {
@@ -391,20 +401,21 @@
     `;
   };
 
-  UI.inlineContent = function inlineContent(item, favoriteHtml = "") {
+  UI.inlineContent = function inlineContent(item, favoriteHtml = null) {
+    const actionHtml = favoriteHtml === null ? (window.BOTSOP_ENTRY_ACTIONS?.(item) || "") : favoriteHtml;
     const hasContent = item.instruction || item.screenshotGuidance || item.screenshots?.length ||
       item.relatedResources?.length || item.linkedTasks?.length || item.closingGuidance ||
-      item.ticketTags?.length || item.url;
-    if (!hasContent && !favoriteHtml) return `<p class="inline-content__empty">No guidance has been added yet.</p>`;
+      item.ticketTagDisplay || item.url;
+    if (!hasContent && !actionHtml) return `<p class="inline-content__empty">No guidance has been added yet.</p>`;
     return `
       <div class="inline-content">
-        ${favoriteHtml}
+        ${actionHtml}
         ${UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
+        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
         ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
-        ${UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
+        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay)}
         ${item.url ? `<a class="primary-action compact-resource-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
       </div>
     `;
