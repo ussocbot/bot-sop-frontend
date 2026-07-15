@@ -24,9 +24,11 @@ window.navigationItems = [];
     "bot expectations": "BOT Expectations",
     "best practices": "Best Practices",
     "wrap up": "Wrap Up",
+    "ban operators and reasons": "Ban Operators and Reasons",
     "oos routing": "OOS Routing",
     "bot tools": "BOT Tools",
     "opus links": "OPUS Links",
+    "qa links": "QA Links",
     "important news": "Important News",
     "sop updates": "SOP Updates",
     "policy reminders": "Policy Reminders"
@@ -75,9 +77,11 @@ window.navigationItems = [];
     "Section|Best Practices": "Best Practices homepage section",
     "Checklist|Wrap Up": "Wrap Up homepage section",
     "Checklist Step|Wrap Up": "nested Wrap Up step",
+    "Section|Ban Operators and Reasons": "Ban Operators and Reasons homepage section",
     "Callout|OOS Routing": "left OOS Routing card",
     "Tool|BOT Tools": "right BOT Tools card",
     "Link|OPUS Links": "right OPUS Links card",
+    "Link|QA Links": "right QA Links card",
     "News|Important News": "right Important News card",
     "SOP Update|SOP Updates": "right SOP Updates card",
     "Warning|Policy Reminders": "bottom-wide policy reminder"
@@ -118,18 +122,15 @@ window.navigationItems = [];
 
   function urlValue(value) {
     if (!value) return "";
-    if (Array.isArray(value)) return urlValue(value[0]);
-    if (typeof value === "object") {
-      return textValue(value.link ?? value.url ?? value.href ?? value.text ?? "");
-    }
-    return textValue(value);
+    return deepUrl(value) || textValue(value);
   }
 
   function deepUrl(value, seen = new Set()) {
     if (!value) return "";
     if (typeof value === "string") {
-      const match = value.match(/https?:\/\/[^\s<>"]+/i);
-      return match ? match[0] : "";
+      const normalized = value.replace(/\\\//g, "/");
+      const match = normalized.match(/https?:\/\/[^\s<>"]+/i);
+      return match ? match[0].replace(/[),.;!?]+$/, "") : "";
     }
     if (typeof value !== "object" || seen.has(value)) return "";
     seen.add(value);
@@ -146,6 +147,10 @@ window.navigationItems = [];
     }
     for (const key of ["mention_doc", "mentionDoc", "document", "doc", "mention", "content"]) {
       const found = deepUrl(value[key], seen);
+      if (found) return found;
+    }
+    for (const nested of Object.values(value)) {
+      const found = deepUrl(nested, seen);
       if (found) return found;
     }
     return "";
@@ -206,12 +211,17 @@ window.navigationItems = [];
       const name = textValue(entry.name ?? entry.file_name ?? entry.fileName) || "Guidance image";
       const mimeType = textValue(entry.type ?? entry.mime_type ?? entry.mimeType);
       const looksLikeImage = mimeType.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
-      if (!fileToken || !looksLikeImage) return null;
+      const directUrl = deepUrl(entry.tmp_url ?? entry.tmpUrl ?? entry.download_url ?? entry.downloadUrl ?? entry.url);
+      if ((!fileToken && !directUrl) || !looksLikeImage) return null;
+      const query = new URLSearchParams();
+      if (fileToken) query.set("file_token", fileToken);
+      if (name) query.set("name", name);
+      if (mimeType) query.set("mime_type", mimeType);
       return {
         fileToken,
         name,
         mimeType,
-        src: `/api/media?file_token=${encodeURIComponent(fileToken)}`
+        src: fileToken ? `/api/media?${query.toString()}` : directUrl
       };
     }).filter(Boolean);
   }
@@ -253,23 +263,30 @@ window.navigationItems = [];
     return index === -1 ? 1000 : index + 1;
   }
 
+  function stableHash(value) {
+    let hash = 0;
+    for (const character of String(value || "record")) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+    return Math.abs(hash);
+  }
+
   function getIcon(record) {
     if (record.iconKey) return record.iconKey;
-    const icons = {
-      "Request Type": "folder",
-      "Process Group": "folders",
-      Process: "file-text",
-      Section: "info",
-      Checklist: "circle-check-big",
-      "Checklist Step": "list-checks",
-      Callout: "route",
-      Tool: "wrench",
-      Link: "link",
-      News: "megaphone",
-      "SOP Update": "file-clock",
-      Warning: "shield-alert"
+    const pools = {
+      "Request Type": ["folder", "layers", "inbox", "layout-grid"],
+      "Process Group": ["folders", "library", "layers", "blocks"],
+      Process: ["file-text", "clipboard-list", "book-open", "scroll-text", "lightbulb"],
+      Section: ["info", "book-open", "lightbulb", "circle-help", "compass"],
+      Checklist: ["circle-check-big", "list-checks", "clipboard-check", "badge-check"],
+      "Checklist Step": ["list-checks", "check-check", "clipboard-check", "circle-check"],
+      Callout: ["route", "signpost", "compass", "flag", "shield-alert"],
+      Tool: ["wrench", "settings", "hammer", "badge-help"],
+      Link: ["link", "external-link", "bookmark", "book-marked"],
+      News: ["megaphone", "newspaper", "bell", "radio"],
+      "SOP Update": ["file-clock", "refresh-cw", "history", "calendar-clock"],
+      Warning: ["shield-alert", "triangle-alert", "badge-alert", "circle-alert"]
     };
-    return icons[record.displayType] || "file-text";
+    const choices = pools[record.displayType] || pools.Process;
+    return choices[stableHash(record.recordId || record.recordKey || record.title) % choices.length];
   }
 
   function mapRecord(record, index, usedIds) {
@@ -322,9 +339,9 @@ window.navigationItems = [];
       parentIds: relationIds(findField(fields, ["Parent"])),
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
-      status: textValue(findField(fields, ["Status"])) || "Active",
+      status: textValue(findField(fields, ["Status"])),
       published: boolValue(findField(fields, ["Published"]), true),
-      url: urlValue(findField(fields, ["URL", "Link"])),
+      url: deepUrl(findField(fields, ["URL", "Link"])) || urlValue(findField(fields, ["URL", "Link"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       badge: textValue(findField(fields, ["Badge"])),
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
@@ -341,6 +358,8 @@ window.navigationItems = [];
       relatedResources: [],
       linkedTasks: [],
       ticketTags: listValue(findField(fields, ["Ticket Tags"])),
+      keywords: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
+      category: textValue(findField(fields, ["Category", "Content Type", "Topic"])),
       ticketTagDisplay: textValue(findField(fields, ["Ticket Tag Display"])),
       closingGuidance: textValue(findField(fields, ["Closing Guidance"])),
       workflow: textValue(findField(fields, ["Workflow"])) || "BOT"
@@ -361,7 +380,9 @@ window.navigationItems = [];
       "Content Name", "Documentation Name", "Resource Name", "Documentation", "Title", "Name"
     ])) || `Documentation ${index + 1}`;
     const summary = textValue(findField(fields, ["Summary", "Description"]));
-    return {
+    const rawScreenshotGuidance = findField(fields, ["Screenshot Guidance"]);
+    const guidanceAttachments = attachmentList(rawScreenshotGuidance);
+    const item = {
       id: `documentation-${slugify(record.record_id || title)}`,
       recordId: record.record_id || "",
       recordKey: textValue(findField(fields, ["Record Key", "Slug"])) || `documentation-${slugify(title)}`,
@@ -369,33 +390,49 @@ window.navigationItems = [];
       summary,
       description: summary,
       instruction: richTextValue(findField(fields, ["Instruction", "Content", "Guidance", "Details"])),
-      url: urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
+      url: deepUrl(findField(fields, ["URL", "Link", "Resource URL"])) || urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
-      icon: textValue(findField(fields, ["Icon Key", "Icon"])) || "link",
+      iconKey: textValue(findField(fields, ["Icon Key", "Icon"])),
       badge: textValue(findField(fields, ["Badge"])),
       websitePlacements: listValue(findField(fields, ["Website Placement", "Website Placements"])),
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
       published: boolValue(findField(fields, ["Published"]), true),
-      status: textValue(findField(fields, ["Status"])) || "Active",
+      status: textValue(findField(fields, ["Status"])),
       lastUpdated: textValue(findField(fields, ["Last Updated", "Updated"])) || "Not available",
+      publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
       appearsIn: [],
       parents: [],
       parentIds: [],
       ticketTags: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
+      keywords: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
+      category: textValue(findField(fields, ["Category", "Content Type", "Topic"])),
       displayType: "Link",
       sourceType: "Documentation",
-      sopRecordIds: relationIds(findField(fields, ["SOP"]))
+      sopRecordIds: relationIds(findField(fields, ["SOP"])),
+      screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
+      screenshots: [...attachmentList(findField(fields, ["Screenshots", "Attachments"])), ...guidanceAttachments],
+      relatedResources: [],
+      linkedTasks: [],
+      closingGuidance: ""
     };
+    item.icon = getIcon(item);
+    return item;
   }
 
-  function buildRequestTypes(items) {
+  function buildRequestTypes(items, allItems = items) {
     const explicit = items.filter(item => item.displayType === "Request Type");
+    const inactiveExplicitTitles = new Set(
+      allItems
+        .filter(item => item.displayType === "Request Type")
+        .filter(item => !item.published || normalizeKey(item.status) !== "active")
+        .map(item => normalizeKey(item.title))
+    );
     const contexts = new Set();
     items
       .filter(item => ["Process", "Process Group"].includes(item.displayType))
       .forEach(item => item.appearsIn.forEach(context => {
-        if (context && !["global", "oos routing"].includes(normalizeKey(context))) contexts.add(context);
+        if (context && !["global", "oos routing"].includes(normalizeKey(context)) && !inactiveExplicitTitles.has(normalizeKey(context))) contexts.add(context);
       }));
     explicit.forEach(item => {
       if (normalizeKey(item.title) !== "oos routing") contexts.add(item.title);
@@ -430,10 +467,17 @@ window.navigationItems = [];
   function buildModel(records, documentationRecords = []) {
     const usedIds = new Set();
     const items = records.map((record, index) => mapRecord(record, index, usedIds));
-    const publishedItems = items.filter(item => item.published);
-    const documents = documentationRecords.map(mapDocumentationRecord).filter(item => item.published);
+    const isActive = item => item.published && normalizeKey(item.status) === "active";
+    const publishedItems = items.filter(isActive);
+    const documents = documentationRecords.map(mapDocumentationRecord).filter(isActive);
     const documentsByRecordId = new Map(documents.map(item => [item.recordId, item]));
     const itemsByRecordId = new Map(publishedItems.map(item => [item.recordId, item]));
+
+    documents.forEach(document => {
+      document.appearsIn = [...new Set(
+        document.sopRecordIds.flatMap(id => itemsByRecordId.get(id)?.appearsIn || [])
+      )];
+    });
 
     publishedItems.forEach(item => {
       item.relatedResources = item.relatedResourceIds
@@ -450,7 +494,7 @@ window.navigationItems = [];
       });
       item.resourceCount = item.relatedResources.length;
     });
-    const requestTypes = buildRequestTypes(publishedItems);
+    const requestTypes = buildRequestTypes(publishedItems, items);
 
     return {
       items: publishedItems,
@@ -508,18 +552,40 @@ window.navigationItems = [];
           )
           .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
       },
-      search(query) {
+      search(query, filters = {}) {
         const normalized = normalizeKey(query);
-        if (!normalized) return [];
+        const terms = normalized.split(" ").filter(Boolean);
+        const source = normalizeKey(filters.source || "all");
+        const contentType = normalizeKey(filters.contentType || "all");
+        const requestType = normalizeKey(filters.requestType || "all");
+        const updatedDays = Number(filters.updatedDays || 0);
+        const now = Date.now();
+
         return [...publishedItems, ...documents]
           .filter(item => item.displayType !== "Request Type")
+          .filter(item => source === "all" || (source === "resource") === (item.sourceType === "Documentation"))
+          .filter(item => contentType === "all" || normalizeKey(item.displayType) === contentType || normalizeKey(item.category) === contentType)
+          .filter(item => requestType === "all" || (item.appearsIn || []).some(value => normalizeKey(value) === requestType))
+          .filter(item => {
+            if (!updatedDays) return true;
+            const raw = String(item.lastUpdated || item.publishDate || "").trim();
+            const timestamp = /^\d{10,13}$/.test(raw)
+              ? (raw.length === 10 ? Number(raw) * 1000 : Number(raw))
+              : Date.parse(raw);
+            return Number.isFinite(timestamp) && now >= timestamp && now - timestamp <= updatedDays * 24 * 60 * 60 * 1000;
+          })
           .map(item => {
             const title = normalizeKey(item.title);
             const haystack = normalizeKey([
               item.title, item.summary, item.instruction,
-              ...(item.appearsIn || []), ...(item.ticketTags || []), ...(item.websitePlacements || [])
+              item.category,
+              ...(item.appearsIn || []), ...(item.ticketTags || []), ...(item.keywords || []),
+              ...(item.websitePlacements || []),
+              ...(item.relatedResources || []).map(resource => `${resource.title || ""} ${resource.summary || ""}`),
+              ...(item.linkedTasks || []).map(task => `${task.title || ""} ${task.summary || ""}`)
             ].join(" "));
-            const score = title === normalized ? 100 : title.startsWith(normalized) ? 75 : title.includes(normalized) ? 50 : haystack.includes(normalized) ? 20 : 0;
+            const matchesTerms = !terms.length || terms.every(term => haystack.includes(term));
+            const score = !matchesTerms ? 0 : title === normalized ? 100 : title.startsWith(normalized) ? 75 : title.includes(normalized) ? 50 : 20;
             return { item, score };
           })
           .filter(result => result.score > 0)
