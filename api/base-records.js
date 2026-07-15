@@ -52,6 +52,7 @@ module.exports = async function baseRecords(req, res) {
         signedInAs: session.name,
         agentAssistantUrl,
         submitResourceUrl: process.env.SUBMIT_RESOURCE_URL || "",
+        sendToMeEnabled: true,
         unacknowledgedUpdatesUrl: process.env.UNACKNOWLEDGED_UPDATES_URL || "",
         favoritesEnabled: Boolean(process.env.FEISHU_FAVORITES_TABLE_ID)
       }
