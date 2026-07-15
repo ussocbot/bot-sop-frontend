@@ -28,6 +28,23 @@ async function fetchWithTimeout(url, options = {}) {
   }
 }
 
+function withExtra(url, extra) {
+  if (!extra) return url;
+  const parsed = new URL(url);
+  if (!parsed.searchParams.has("extra")) parsed.searchParams.set("extra", extra);
+  return parsed.toString();
+}
+
+async function diagnostic(response) {
+  if (!response) return {};
+  try {
+    const body = await response.clone().json();
+    return { status: response.status, code: body?.code, message: body?.msg || body?.message };
+  } catch (error) {
+    return { status: response.status };
+  }
+}
+
 module.exports = async function media(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -40,8 +57,12 @@ module.exports = async function media(req, res) {
   if (!session) return res.status(401).json({ error: "Feishu sign-in required" });
 
   const fileToken = String(req.query?.file_token || "");
+  const extra = String(req.query?.extra || "");
   if (!/^[A-Za-z0-9_-]{6,240}$/.test(fileToken)) {
     return res.status(400).json({ error: "Invalid media token" });
+  }
+  if (extra.length > 12000 || /[\u0000-\u001f\u007f]/.test(extra)) {
+    return res.status(400).json({ error: "Invalid media authorization" });
   }
 
   const appId = process.env.FEISHU_APP_ID;
@@ -52,29 +73,58 @@ module.exports = async function media(req, res) {
   try {
     const tenantToken = await getTenantToken({ apiOrigin, appId, appSecret });
     const authorization = { Authorization: `Bearer ${tenantToken}` };
-    let response = await fetchWithTimeout(
+    const directUrl = withExtra(
       `${apiOrigin}/open-apis/drive/v1/medias/${encodeURIComponent(fileToken)}/download`,
-      { headers: authorization, redirect: "follow" }
+      extra
     );
+    let response = await fetchWithTimeout(directUrl, {
+      headers: authorization,
+      redirect: "follow"
+    });
+    const directFailure = response.ok ? null : await diagnostic(response);
 
     if (!response.ok) {
-      const temporaryUrlResponse = await fetchWithTimeout(
+      const temporaryEndpoint = withExtra(
         `${apiOrigin}/open-apis/drive/v1/medias/batch_get_tmp_download_url?file_tokens=${encodeURIComponent(fileToken)}`,
-        { headers: authorization }
+        extra
       );
+      const temporaryUrlResponse = await fetchWithTimeout(temporaryEndpoint, { headers: authorization });
+      const temporaryFailure = temporaryUrlResponse.ok ? null : await diagnostic(temporaryUrlResponse);
+
       if (temporaryUrlResponse.ok) {
         const payload = await temporaryUrlResponse.json().catch(() => ({}));
         const entries = payload?.data?.tmp_download_urls || payload?.data?.tmp_download_url || [];
-        const temporaryUrl = (Array.isArray(entries) ? entries : [entries])
-          .find(entry => entry?.file_token === fileToken || entry?.fileToken === fileToken)?.tmp_download_url ||
-          (Array.isArray(entries) ? entries : [entries])[0]?.tmp_download_url;
-        if (temporaryUrl) response = await fetchWithTimeout(temporaryUrl, { redirect: "follow" });
+        const list = Array.isArray(entries) ? entries : [entries];
+        const matching = list.find(entry => entry?.file_token === fileToken || entry?.fileToken === fileToken) || list[0];
+        const temporaryUrl = matching?.tmp_download_url || matching?.tmpUrl || matching?.url;
+        if (temporaryUrl) {
+          response = await fetchWithTimeout(withExtra(temporaryUrl, extra), { redirect: "follow" });
+          if (!response.ok) {
+            response = await fetchWithTimeout(withExtra(temporaryUrl, extra), {
+              headers: authorization,
+              redirect: "follow"
+            });
+          }
+        }
       }
-    }
 
-    if (!response.ok) {
-      console.error("Media download failed", { status: response.status, fileToken: fileToken.slice(0, 8) });
-      return res.status(response.status === 404 ? 404 : 502).json({ error: "Unable to retrieve this image" });
+      if (!response.ok) {
+        const finalFailure = await diagnostic(response);
+        console.error("Media download failed", {
+          fileToken: fileToken.slice(0, 8),
+          hasExtra: Boolean(extra),
+          direct: directFailure,
+          temporary: temporaryFailure,
+          final: finalFailure
+        });
+        const permissionFailure = [directFailure?.status, temporaryFailure?.status, finalFailure?.status]
+          .some(status => status === 400 || status === 401 || status === 403);
+        return res.status(permissionFailure ? 403 : (response.status === 404 ? 404 : 502)).json({
+          error: permissionFailure
+            ? "The app cannot download this attachment. Check Feishu attachment permissions."
+            : "Unable to retrieve this image"
+        });
+      }
     }
 
     const contentType = imageTypeFromRequest(req, response.headers.get("content-type"));
@@ -87,7 +137,13 @@ module.exports = async function media(req, res) {
     res.setHeader("Content-Disposition", "inline");
     return res.status(200).send(data);
   } catch (error) {
-    console.error("Media proxy failed", { message: error.message });
+    console.error("Media proxy failed", {
+      message: error.message,
+      fileToken: fileToken.slice(0, 8),
+      hasExtra: Boolean(extra)
+    });
     return res.status(502).json({ error: "Unable to retrieve this image" });
   }
 };
+
+
