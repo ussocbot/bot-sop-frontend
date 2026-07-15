@@ -309,13 +309,13 @@
     `;
   };
 
-  UI.detailSection = function detailSection(title, iconName, value) {
+  UI.detailSection = function detailSection(title, iconName, value, className = "") {
     if (!value || (Array.isArray(value) && !value.length)) return "";
     const body = Array.isArray(value)
       ? `<ul>${value.map(item => `<li>${UI.escape(item)}</li>`).join("")}</ul>`
       : UI.textBlocks(value);
     return `
-      <section class="detail-section">
+      <section class="detail-section ${UI.escape(className)}">
         <h2>${UI.icon(iconName)} ${UI.escape(title)}</h2>
         <div class="detail-section__body">${body}</div>
       </section>
@@ -390,11 +390,16 @@
         <h2>${UI.icon("images")} Guidance Images</h2>
         <div class="guidance-gallery">
           ${images.map(image => `
-            <button type="button" data-src="${UI.escape(image.src)}" data-name="${UI.escape(image.name)}" onclick="openGuidanceImage(this.dataset.src, this.dataset.name)" aria-label="Open ${UI.escape(image.name)}">
-              <img src="${UI.escape(image.src)}" alt="${UI.escape(image.name)}" loading="lazy" onerror="this.closest('button').classList.add('is-error'); this.alt='Image unavailable';">
-              <span class="guidance-gallery__name">${UI.escape(image.name)}</span>
-              <span class="guidance-gallery__error">Image unavailable</span>
-            </button>
+            <div class="guidance-gallery__item" data-image-item>
+              <button type="button" class="guidance-gallery__open" data-src="${UI.escape(image.src)}" data-name="${UI.escape(image.name)}" onclick="openGuidanceImage(this.dataset.src, this.dataset.name)" aria-label="Open ${UI.escape(image.name)}">
+                <img src="${UI.escape(image.src)}" alt="${UI.escape(image.name)}" loading="lazy" onload="this.closest('[data-image-item]').classList.remove('is-error')" onerror="this.closest('[data-image-item]').classList.add('is-error'); this.alt='Image unavailable';">
+                <span class="guidance-gallery__name">${UI.escape(image.name)}</span>
+              </button>
+              <div class="guidance-gallery__error" role="status">
+                <strong>Image unavailable</strong>
+                <button type="button" data-src="${UI.escape(image.src)}" onclick="retryGuidanceImage(this)">${UI.icon("refresh-cw")} Retry</button>
+              </div>
+            </div>
           `).join("")}
         </div>
       </section>
@@ -411,11 +416,11 @@
       <div class="inline-content">
         ${actionHtml}
         ${UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
-        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
+        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
+        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
+        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
-        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay)}
         ${item.url ? `<a class="primary-action compact-resource-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
       </div>
     `;
@@ -451,6 +456,16 @@
     }
   };
 
+  window.retryGuidanceImage = function retryGuidanceImage(button) {
+    const item = button?.closest("[data-image-item]");
+    const image = item?.querySelector("img");
+    const source = button?.dataset.src || image?.src;
+    if (!item || !image || !source) return;
+    item.classList.remove("is-error");
+    const separator = source.includes("?") ? "&" : "?";
+    image.src = `${source}${separator}retry=${Date.now()}`;
+  };
+
   UI.installImageViewer = function installImageViewer() {
     if (document.getElementById("guidance-image-viewer")) return;
     document.body.insertAdjacentHTML("beforeend", `
@@ -481,3 +496,5 @@
     });
   };
 })();
+
+
