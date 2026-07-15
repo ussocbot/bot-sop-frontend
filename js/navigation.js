@@ -8,7 +8,10 @@
 
     const callouts = model.section("Callout", "OOS Routing");
     const oosRoutes = model.documentsFor("OOS Routing");
-    const hiddenRequestTypes = new Set(["e-commerce", "ecommerce", "best practices"]);
+    const hiddenRequestTypes = new Set([
+      "e-commerce", "ecommerce", "best practices",
+      "wrap up", "response wrap-up", "response wrap up"
+    ]);
     const visibleRequestTypes = model.requestTypes.filter(item => !hiddenRequestTypes.has(item.title.trim().toLowerCase()));
     nav.innerHTML = `
       <div class="nav-block">
