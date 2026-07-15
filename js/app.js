@@ -58,7 +58,7 @@ window.appState = {
   }
 
   function processAccordionList(items) {
-    return `<div class="process-list">${items.map(item => window.BOTSOP_UI.processAccordion(item, favoriteButton(item))).join("")}</div>`;
+    return `<div class="process-list">${items.map(item => window.BOTSOP_UI.processAccordion(item, entryActionButtons(item))).join("")}</div>`;
   }
 
   function remember(view, id, query = "") {
@@ -83,6 +83,18 @@ window.appState = {
     const active = window.appState.favorites.has(favoriteKey(item));
     return `<button type="button" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')">${window.BOTSOP_UI.icon("star")} ${active ? "Remove from Favorites" : "Add to Favorites"}</button>`;
   }
+
+  function sendToMeButton(item) {
+    if (!window.baseMeta?.sendToMeEnabled || !item.recordId || item.displayType === "Request Type") return "";
+    return `<button type="button" class="send-to-me-button" onclick="sendToMe('${window.BOTSOP_UI.escape(item.id)}', this)">${window.BOTSOP_UI.icon("send")} Send to Me</button>`;
+  }
+
+  function entryActionButtons(item) {
+    const actions = [favoriteButton(item), sendToMeButton(item)].filter(Boolean).join("");
+    return actions ? `<div class="inline-entry-actions">${actions}</div>` : "";
+  }
+
+  window.BOTSOP_ENTRY_ACTIONS = entryActionButtons;
 
   window.showHome = function showHome(addToHistory = true) {
     const model = window.baseModel;
@@ -206,7 +218,8 @@ window.appState = {
       item.status && `<span>${window.BOTSOP_UI.icon("circle-dot")} ${window.BOTSOP_UI.escape(item.status)}</span>`,
       item.lastUpdated && `<span>${window.BOTSOP_UI.icon("calendar-clock")} Updated ${window.BOTSOP_UI.escape(item.lastUpdated)}</span>`,
       item.displayType && `<span>${window.BOTSOP_UI.icon("layout-template")} ${window.BOTSOP_UI.escape(item.displayType)}</span>`,
-      favoriteButton(item, true)
+      favoriteButton(item, true),
+      sendToMeButton(item)
     ].filter(Boolean).join("");
 
     renderAndRefresh(`
@@ -223,11 +236,11 @@ window.appState = {
         </header>
         <div class="record-meta">${meta}</div>
         ${window.BOTSOP_UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
+        ${window.BOTSOP_UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
         ${window.BOTSOP_UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${window.BOTSOP_UI.imageGallery(item.screenshots)}
         ${window.BOTSOP_UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${window.BOTSOP_UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
-        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
+        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay)}
         ${item.url ? `<a class="primary-action" href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${window.BOTSOP_UI.escape(item.ctaLabel)} ${window.BOTSOP_UI.icon("arrow-up-right")}</a>` : ""}
       </article>
     `);
@@ -322,6 +335,50 @@ window.appState = {
     else if (window.appState.currentView === "home") window.showHome(false);
     else if (window.appState.currentView === "favorites") window.showFavorites(false);
     else window.showRecord(item.id, false);
+  };
+
+  window.sendToMe = async function sendToMe(itemId, button) {
+    const item = window.baseModel?.find(itemId);
+    if (!item?.recordId || !window.baseMeta?.sendToMeEnabled || button?.disabled) return;
+    const original = button?.innerHTML || "";
+    if (button) {
+      button.disabled = true;
+      button.classList.remove("is-sent", "is-error");
+      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")} Sending…`;
+      window.BOTSOP_UI.refreshIcons();
+    }
+    try {
+      const response = await fetch("/api/send-to-me", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ recordId: item.recordId, recordType: item.sourceType === "Documentation" ? "Resource" : "SOP" })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Unable to send this entry");
+      if (button) {
+        button.classList.add("is-sent");
+        button.innerHTML = `${window.BOTSOP_UI.icon("check")} Sent to Feishu`;
+      }
+    } catch (error) {
+      if (button) {
+        button.classList.add("is-error");
+        button.innerHTML = `${window.BOTSOP_UI.icon("triangle-alert")} Send failed`;
+        button.title = error.message;
+      }
+    } finally {
+      if (button) {
+        button.disabled = false;
+        window.BOTSOP_UI.refreshIcons();
+        window.setTimeout(() => {
+          if (!button.isConnected) return;
+          button.classList.remove("is-sent", "is-error");
+          button.innerHTML = original;
+          button.title = "";
+          window.BOTSOP_UI.refreshIcons();
+        }, 2500);
+      }
+    }
   };
 
   async function loadFavorites() {
