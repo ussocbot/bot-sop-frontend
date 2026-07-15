@@ -128,7 +128,7 @@
   };
 
   UI.sidebarCard = function sidebarCard(title, iconName, items, tone) {
-    const showDescriptions = !["BOT Tools", "OPUS Links"].includes(title);
+    const showDescriptions = !["BOT Tools", "OPUS Links", "QA Links"].includes(title);
     return `
       <section class="side-card side-card--${UI.escape(tone)}">
         <header class="side-card__header">
@@ -160,53 +160,41 @@
       UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "green"),
       UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "orange"),
       UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue"),
-      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet")
+      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet"),
+      UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal")
     ].join("");
   };
 
-UI.guidanceDropdownSection = function guidanceDropdownSection(
-  title,
-  iconName,
-  items,
-  tone
-) {
-  return `
-    <section class="home-strip home-strip--${UI.escape(tone)} expectations-strip">
-      <div class="home-strip__heading">
-        <span class="home-strip__icon">${UI.icon(iconName)}</span>
-        <div>
-          <h2>${UI.escape(title)}</h2>
-          <p>${
-            items.length
-              ? `${items.length} published item${items.length === 1 ? "" : "s"}`
-              : "Nothing is mapped here yet."
-          }</p>
+  UI.guidanceDropdownSection = function guidanceDropdownSection(title, iconName, items, tone, summaryText = "") {
+    const group = String(title || "guidance").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    return `
+      <details class="home-strip home-strip--${UI.escape(tone)} expectations-strip home-section-accordion" data-accordion-group="home-sections">
+        <summary class="home-strip__heading">
+          <span class="home-strip__icon">${UI.icon(iconName)}</span>
+          <div class="home-strip__heading-copy">
+            <h2>${UI.escape(title)}</h2>
+            <p class="home-strip__summary">${UI.escape(summaryText || (items.length ? `${items.length} active item${items.length === 1 ? "" : "s"}` : "Nothing is mapped here yet."))}</p>
+          </div>
+          <span class="home-strip__count">${items.length}</span>
+          ${UI.icon("chevron-down", "home-strip__chevron")}
+        </summary>
+        <div class="home-strip__content">
+          ${items.length ? items.map(item => `
+            <details class="expectation-item" data-accordion-group="home-entry-${UI.escape(group)}">
+              <summary>
+                <span class="expectation-item__title"><span class="expectation-item__icon">${UI.icon(item.icon || "file-text")}</span><strong>${UI.escape(item.title)}</strong></span>
+                ${UI.icon("chevron-down")}
+              </summary>
+              <div class="expectation-item__body">${UI.inlineContent(item)}</div>
+            </details>
+          `).join("") : `<p class="home-strip__empty">Nothing is mapped here yet.</p>`}
         </div>
-      </div>
+      </details>
+    `;
+  };
 
-      <div class="home-strip__content">
-        ${items.map(item => `
-          <details
-            class="expectation-item"
-            data-accordion-group="home-guidance"
-          >
-            <summary>
-              <strong>${UI.escape(item.title)}</strong>
-              ${UI.icon("chevron-down")}
-            </summary>
-
-            <div class="expectation-item__body">
-              ${UI.inlineContent(item)}
-            </div>
-          </details>
-        `).join("")}
-      </div>
-    </section>
-  `;
-};
-
-  UI.expectationsSection = function expectationsSection(items) {
-    return UI.guidanceDropdownSection("BOT Expectations", "clock-3", items, "green");
+  UI.expectationsSection = function expectationsSection(items, summaryText = "") {
+    return UI.guidanceDropdownSection("BOT Expectations", "clock-3", items, "green", summaryText);
   };
 
   UI.homeSection = function homeSection(title, iconName, items, tone) {
@@ -281,45 +269,25 @@ UI.guidanceDropdownSection = function guidanceDropdownSection(
       </button>
     `;
   };
-UI.processAccordion = function processAccordion(
-  item,
-  favoriteHtml = ""
-) {
-  const kind =
-    item.sourceType === "Documentation"
-      ? "Resource"
-      : "SOP";
 
-  return `
-    <details
-      class="process-accordion"
-      data-accordion-group="process-guidance"
-    >
-      <summary>
-        <span class="process-card__icon">
-          ${UI.icon(item.icon || "file-text")}
-        </span>
+  UI.processAccordion = function processAccordion(item, favoriteHtml = "") {
+    const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
+    return `
+      <details class="process-accordion" data-accordion-group="process-guidance">
+        <summary>
+          <span class="process-card__icon">${UI.icon(item.icon || "file-text")}</span>
+          <span class="process-accordion__preview">
+            <em class="content-kind">${kind}</em>
+            <strong>${UI.escape(item.title)}</strong>
+            <small>${UI.escape(item.description || "Open guidance")}</small>
+          </span>
+          ${UI.icon("chevron-down", "process-accordion__chevron")}
+        </summary>
+        <div class="process-accordion__body">${UI.inlineContent(item, favoriteHtml)}</div>
+      </details>
+    `;
+  };
 
-        <span class="process-accordion__preview">
-          <em class="content-kind">${kind}</em>
-          <strong>${UI.escape(item.title)}</strong>
-          <small>
-            ${UI.escape(item.description || "Open guidance")}
-          </small>
-        </span>
-
-        ${UI.icon(
-          "chevron-down",
-          "process-accordion__chevron"
-        )}
-      </summary>
-
-      <div class="process-accordion__body">
-        ${UI.inlineContent(item, favoriteHtml)}
-      </div>
-    </details>
-  `;
-};
   UI.updatesCallout = function updatesCallout(url) {
     if (!url) return "";
     return `
@@ -385,14 +353,20 @@ UI.processAccordion = function processAccordion(
         <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
         <div class="detail-link-list">
           ${relatedResources.map(item => `
-            <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
-              <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">Resource</small></span>${UI.icon("arrow-up-right")}
-            </a>
+            <div class="detail-link-row">
+              <a class="detail-link-main" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+                <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">Resource</small></span>${UI.icon("arrow-up-right")}
+              </a>
+              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(item.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(item.title)}" title="Copy link">${UI.icon("copy")}</button>
+            </div>
           `).join("")}
           ${linkedTasks.map(item => `
-            <button type="button" onclick="showRecord('${UI.escape(item.id)}')">
-              <span>${UI.icon("file-text")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
-            </button>
+            <div class="detail-link-row">
+              <button type="button" class="detail-link-main" onclick="showRecord('${UI.escape(item.id)}')">
+                <span>${UI.icon(item.icon || "file-text")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
+              </button>
+              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(`${window.location.origin}${window.location.pathname}?record=${encodeURIComponent(item.id)}`)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(item.title)}" title="Copy link">${UI.icon("copy")}</button>
+            </div>
           `).join("")}
         </div>
       </section>
@@ -407,89 +381,65 @@ UI.processAccordion = function processAccordion(
         <div class="guidance-gallery">
           ${images.map(image => `
             <button type="button" data-src="${UI.escape(image.src)}" data-name="${UI.escape(image.name)}" onclick="openGuidanceImage(this.dataset.src, this.dataset.name)" aria-label="Open ${UI.escape(image.name)}">
-              <img src="${UI.escape(image.src)}" alt="${UI.escape(image.name)}" loading="lazy">
-              <span>${UI.escape(image.name)}</span>
+              <img src="${UI.escape(image.src)}" alt="${UI.escape(image.name)}" loading="lazy" onerror="this.closest('button').classList.add('is-error'); this.alt='Image unavailable';">
+              <span class="guidance-gallery__name">${UI.escape(image.name)}</span>
+              <span class="guidance-gallery__error">Image unavailable</span>
             </button>
           `).join("")}
         </div>
       </section>
     `;
   };
-UI.inlineContent = function inlineContent(
-  item,
-  favoriteHtml = ""
-) {
-  const hasContent =
-    item.instruction ||
-    item.screenshotGuidance ||
-    item.screenshots?.length ||
-    item.relatedResources?.length ||
-    item.linkedTasks?.length ||
-    item.closingGuidance ||
-    item.ticketTags?.length ||
-    item.url;
 
-  if (!hasContent && !favoriteHtml) {
+  UI.inlineContent = function inlineContent(item, favoriteHtml = "") {
+    const hasContent = item.instruction || item.screenshotGuidance || item.screenshots?.length ||
+      item.relatedResources?.length || item.linkedTasks?.length || item.closingGuidance ||
+      item.ticketTags?.length || item.url;
+    if (!hasContent && !favoriteHtml) return `<p class="inline-content__empty">No guidance has been added yet.</p>`;
     return `
-      <p class="inline-content__empty">
-        No guidance has been added yet.
-      </p>
+      <div class="inline-content">
+        ${favoriteHtml}
+        ${UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
+        ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
+        ${UI.imageGallery(item.screenshots)}
+        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
+        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
+        ${UI.detailSection("Ticket Tags", "tags", item.ticketTags)}
+        ${item.url ? `<a class="primary-action compact-resource-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
+      </div>
     `;
-  }
+  };
 
-  return `
-    <div class="inline-content">
-      ${favoriteHtml}
-
-      ${UI.markdownSection(
-        "Instructions",
-        "clipboard-list",
-        item.instruction
-      )}
-
-      ${UI.detailSection(
-        "Screenshot Guidance",
-        "image",
-        item.screenshotGuidance
-      )}
-
-      ${UI.imageGallery(item.screenshots)}
-
-      ${UI.relatedItemsSection(
-        item.relatedResources,
-        item.linkedTasks
-      )}
-
-      ${UI.detailSection(
-        "Closing Guidance",
-        "message-square-check",
-        item.closingGuidance
-      )}
-
-      ${UI.detailSection(
-        "Ticket Tags",
-        "tags",
-        item.ticketTags
-      )}
-
-      ${
-        item.url
-          ? `
-            <a
-              class="primary-action"
-              href="${UI.escape(item.url)}"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              ${UI.escape(item.ctaLabel || "Open Resource")}
-              ${UI.icon("arrow-up-right")}
-            </a>
-          `
-          : ""
+  window.copyRelatedLink = async function copyRelatedLink(url, button) {
+    if (!url) return;
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(url);
+      else {
+        const fallback = document.createElement("textarea");
+        fallback.value = url;
+        fallback.style.position = "fixed";
+        fallback.style.opacity = "0";
+        document.body.appendChild(fallback);
+        fallback.select();
+        document.execCommand("copy");
+        fallback.remove();
       }
-    </div>
-  `;
-};
+      if (button) {
+        button.classList.add("is-copied");
+        button.innerHTML = `${UI.icon("check")}<span>Copied</span>`;
+        UI.refreshIcons();
+        window.setTimeout(() => {
+          if (!button.isConnected) return;
+          button.classList.remove("is-copied");
+          button.innerHTML = UI.icon("copy");
+          UI.refreshIcons();
+        }, 1600);
+      }
+    } catch (error) {
+      window.alert("Unable to copy this link. Please try again.");
+    }
+  };
+
   UI.installImageViewer = function installImageViewer() {
     if (document.getElementById("guidance-image-viewer")) return;
     document.body.insertAdjacentHTML("beforeend", `
