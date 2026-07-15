@@ -49,22 +49,87 @@ function isVisible(fields) {
   const status = textValue(findField(fields, ["Status"]));
   const published = findField(fields, ["Published"]);
   const publishedText = normalize(textValue(published));
-  const isPublished = published === null || published === undefined || published === "" || published === true || !["false", "no", "0", "draft", "unpublished"].includes(publishedText);
+  const isPublished = published === null || published === undefined || published === "" || published === true ||
+    !["false", "no", "0", "draft", "unpublished"].includes(publishedText);
   return normalize(status) === "active" && isPublished;
 }
 
-function clipped(value, maximum = 2200) {
-  const text = textValue(value).replace(/\s+/g, " ").trim();
-  return text.length > maximum ? `${text.slice(0, maximum - 1)}…` : text;
+function clipped(value, maximum = 2400) {
+  const text = (typeof value === "string" ? value : textValue(value)).replace(/\r\n?/g, "\n").trim();
+  return text.length > maximum ? `${text.slice(0, maximum - 1)}â€¦` : text;
 }
 
-function textRow(label, value) {
-  const text = clipped(value);
-  if (!text) return null;
-  return [
-    { tag: "text", text: `${label}: `, style: ["bold"] },
-    { tag: "text", text }
-  ];
+function safeLink(url) {
+  const value = String(url || "").trim();
+  return /^https:\/\//i.test(value) ? value.replace(/[()\s]/g, character => encodeURIComponent(character)) : "";
+}
+
+function markdownValue(value, seen = new Set()) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+  if (typeof value !== "object" || seen.has(value)) return "";
+  seen.add(value);
+  if (Array.isArray(value)) return value.map(item => markdownValue(item, seen)).filter(Boolean).join("\n");
+
+  const url = safeLink(deepUrl(value));
+  const label = textValue(value.text ?? value.name ?? value.title ?? value.label ?? value.content ?? "");
+  if (url && label) return `[${label.replace(/[\[\]]/g, "")}](${url})`;
+  if (url) return `[Open link](${url})`;
+  return textValue(value);
+}
+
+function relationIds(value) {
+  const ids = new Set();
+  function visit(entry) {
+    if (!entry) return;
+    if (Array.isArray(entry)) return entry.forEach(visit);
+    if (typeof entry === "string") {
+      if (/^rec[A-Za-z0-9_-]+$/.test(entry)) ids.add(entry);
+      return;
+    }
+    if (typeof entry !== "object") return;
+    visit(entry.record_id);
+    visit(entry.recordId);
+    visit(entry.record_ids);
+    visit(entry.recordIds);
+    visit(entry.link_record_ids);
+    if (typeof entry.id === "string" && /^rec/.test(entry.id)) visit(entry.id);
+  }
+  visit(value);
+  return [...ids];
+}
+
+function entryTitle(record) {
+  return textValue(findField(record?.fields || {}, [
+    "Content Name", "Documentation Name", "Resource Name", "Documentation", "Title", "Name"
+  ])) || "Untitled entry";
+}
+
+function websiteEntryUrl(appUrl, record, resource = false) {
+  if (!appUrl || !record) return "";
+  const fields = record.fields || {};
+  const key = resource
+    ? `documentation-${slugify(record.record_id || entryTitle(record))}`
+    : slugify(textValue(findField(fields, ["Record Key", "Slug", "ID"])) || entryTitle(record));
+  return `${appUrl}/?record=${encodeURIComponent(key)}`;
+}
+
+function markdownSection(title, value, maximum = 2400) {
+  const content = clipped(markdownValue(value), maximum);
+  if (!content) return null;
+  return {
+    tag: "div",
+    text: {
+      tag: "lark_md",
+      content: `**${title}**\n${content}`
+    }
+  };
+}
+
+function divider() {
+  return { tag: "hr" };
 }
 
 module.exports = async function sendToMe(req, res) {
@@ -87,13 +152,13 @@ module.exports = async function sendToMe(req, res) {
   const appSecret = process.env.FEISHU_APP_SECRET;
   const appToken = process.env.FEISHU_BASE_APP_TOKEN;
   const apiOrigin = process.env.FEISHU_API_ORIGIN || "https://open.feishu.cn";
+  const sopTableId = process.env.FEISHU_TABLE_ID;
+  const sopViewId = process.env.FEISHU_VIEW_ID;
+  const documentationTableId = process.env.FEISHU_DOCUMENTATION_TABLE_ID || "tbljdoFsgOuHMGSO";
+  const documentationViewId = process.env.FEISHU_DOCUMENTATION_VIEW_ID || "vewyqW3oZ3";
   const isResource = recordType === "Resource";
-  const tableId = isResource
-    ? (process.env.FEISHU_DOCUMENTATION_TABLE_ID || "tbljdoFsgOuHMGSO")
-    : process.env.FEISHU_TABLE_ID;
-  const viewId = isResource
-    ? (process.env.FEISHU_DOCUMENTATION_VIEW_ID || "vewyqW3oZ3")
-    : process.env.FEISHU_VIEW_ID;
+  const tableId = isResource ? documentationTableId : sopTableId;
+  const viewId = isResource ? documentationViewId : sopViewId;
 
   if (!appId || !appSecret || !appToken || !tableId) {
     return res.status(500).json({ error: "Send to Me is not configured" });
@@ -101,8 +166,16 @@ module.exports = async function sendToMe(req, res) {
 
   try {
     const tenantToken = await getTenantToken({ apiOrigin, appId, appSecret });
-    const records = await fetchTableRecords({ apiOrigin, tenantToken, appToken, tableId, viewId });
-    const record = records.find(item => item.record_id === recordId);
+    const [sourceRecords, sopRecords, documentationRecords] = await Promise.all([
+      fetchTableRecords({ apiOrigin, tenantToken, appToken, tableId, viewId }),
+      isResource && sopTableId
+        ? fetchTableRecords({ apiOrigin, tenantToken, appToken, tableId: sopTableId, viewId: sopViewId })
+        : Promise.resolve([]),
+      !isResource && documentationTableId
+        ? fetchTableRecords({ apiOrigin, tenantToken, appToken, tableId: documentationTableId, viewId: documentationViewId })
+        : Promise.resolve([])
+    ]);
+    const record = sourceRecords.find(item => item.record_id === recordId);
     if (!record || !isVisible(record.fields || {})) return res.status(404).json({ error: "This entry is unavailable" });
 
     const fields = record.fields || {};
@@ -111,26 +184,87 @@ module.exports = async function sendToMe(req, res) {
     const instruction = findField(fields, ["Instruction", "Content", "Guidance"]);
     const closingGuidance = findField(fields, ["Closing Guidance"]);
     const ticketTagDisplay = findField(fields, ["Ticket Tag Display"]);
-    const relatedResources = findField(fields, ["Related Resources"]);
-    const linkedTasks = findField(fields, ["Linked Tasks"]);
-    const resourceUrl = deepUrl(findField(fields, ["URL", "Link", "Resource URL"]));
-    const recordKey = textValue(findField(fields, ["Record Key", "Slug"])) || slugify(title);
+    const resourceUrl = safeLink(deepUrl(findField(fields, ["URL", "Link", "Resource URL"])));
     const appUrl = String(process.env.APP_URL || "").replace(/\/$/, "");
-    const websiteUrl = appUrl ? `${appUrl}/?record=${encodeURIComponent(slugify(recordKey))}` : "";
+    const websiteUrl = websiteEntryUrl(appUrl, record, isResource);
 
-    const rows = [
-      textRow("Summary", summary),
-      textRow("Instructions", instruction),
-      textRow("Closing Guidance", closingGuidance),
-      textRow("Ticket Tags", ticketTagDisplay),
-      textRow("Related Resources", relatedResources),
-      textRow("Related Tasks", linkedTasks)
+    const activeSopRecords = (isResource ? sopRecords : sourceRecords).filter(item => isVisible(item.fields || {}));
+    const activeDocumentationRecords = (isResource ? sourceRecords : documentationRecords).filter(item => isVisible(item.fields || {}));
+    const sopById = new Map(activeSopRecords.map(item => [item.record_id, item]));
+    const documentationById = new Map(activeDocumentationRecords.map(item => [item.record_id, item]));
+
+    const relatedResources = relationIds(findField(fields, ["Related Resources"]))
+      .map(id => documentationById.get(id))
+      .filter(Boolean)
+      .map(item => ({
+        title: entryTitle(item),
+        url: safeLink(deepUrl(findField(item.fields || {}, ["URL", "Link", "Resource URL"]))) || websiteEntryUrl(appUrl, item, true)
+      }))
+      .filter(item => item.url);
+
+    const linkedTasks = relationIds(findField(fields, ["Linked Tasks"]))
+      .map(id => sopById.get(id))
+      .filter(Boolean)
+      .map(item => ({ title: entryTitle(item), url: websiteEntryUrl(appUrl, item, false) }))
+      .filter(item => item.url);
+
+    const relatedLinks = [...relatedResources, ...linkedTasks];
+    const elements = [
+      markdownSection("Summary", summary, 1000),
+      markdownSection("Instructions", instruction),
+      markdownSection("Closing Guidance", closingGuidance, 1400),
+      markdownSection("Ticket Tags", ticketTagDisplay, 800)
     ].filter(Boolean);
-    if (resourceUrl) rows.push([{ tag: "a", text: "Open Resource", href: resourceUrl }]);
-    if (websiteUrl) rows.push([{ tag: "a", text: "Open in BOT SOP", href: websiteUrl }]);
-    if (!rows.length) rows.push([{ tag: "text", text: "Open this entry in BOT SOP to review its guidance." }]);
 
-    const content = JSON.stringify({ en_us: { title, content: rows } });
+    if (relatedLinks.length) {
+      if (elements.length) elements.push(divider());
+      elements.push({
+        tag: "div",
+        text: {
+          tag: "lark_md",
+          content: `**Related Resources & Tasks**\n${relatedLinks
+            .slice(0, 20)
+            .map(item => `â€¢ [${item.title.replace(/[\[\]]/g, "")}](${safeLink(item.url)})`)
+            .join("\n")}`
+        }
+      });
+    }
+
+    const actions = [];
+    if (resourceUrl) {
+      actions.push({
+        tag: "button",
+        text: { tag: "plain_text", content: "Open Resource" },
+        type: "default",
+        url: resourceUrl
+      });
+    }
+    if (websiteUrl) {
+      actions.push({
+        tag: "button",
+        text: { tag: "plain_text", content: "Open in BOT SOP" },
+        type: "primary",
+        url: websiteUrl
+      });
+    }
+    if (actions.length) elements.push({ tag: "action", actions });
+    if (!elements.length) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: "Open this entry in BOT SOP to review its guidance." }
+      });
+    }
+
+    const card = {
+      config: { wide_screen_mode: true, enable_forward: true },
+      header: {
+        template: "blue",
+        title: { tag: "plain_text", content: title },
+        subtitle: { tag: "plain_text", content: isResource ? "BOT SOP Resource" : "BOT SOP Guidance" }
+      },
+      elements
+    };
+
     const response = await fetchJson(
       `${apiOrigin}/open-apis/im/v1/messages?receive_id_type=open_id`,
       {
@@ -141,8 +275,8 @@ module.exports = async function sendToMe(req, res) {
         },
         body: JSON.stringify({
           receive_id: session.openId,
-          msg_type: "post",
-          content,
+          msg_type: "interactive",
+          content: JSON.stringify(card),
           uuid: randomUUID()
         })
       }
@@ -150,10 +284,16 @@ module.exports = async function sendToMe(req, res) {
 
     return res.status(200).json({ ok: true, messageId: response.data?.message_id || "" });
   } catch (error) {
-    console.error("Send to Me failed", { message: error.message, status: error.status, feishuCode: error.feishuCode });
+    console.error("Send to Me failed", {
+      message: error.message,
+      status: error.status,
+      feishuCode: error.feishuCode
+    });
     if (error.feishuCode === 99991663 || error.status === 403) {
       return res.status(403).json({ error: "The app needs permission to send Feishu messages" });
     }
     return res.status(502).json({ error: "Unable to send this entry to Feishu" });
   }
 };
+
+
