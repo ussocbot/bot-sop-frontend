@@ -163,7 +163,7 @@ window.appState = {
 
     renderAndRefresh(`
       <div class="page-stack">
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>›</span><span>${window.BOTSOP_UI.escape(requestType.title)}</span></nav>
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(requestType.title)}</span></nav>
         <header class="process-header">
           <span class="process-header__icon">${window.BOTSOP_UI.icon(requestType.icon || "folder")}</span>
           <div><p>Request Type</p><h1>${window.BOTSOP_UI.escape(requestType.title)}</h1><span>${window.BOTSOP_UI.escape(requestType.summary || requestType.description || "Operational guidance and workflows")}</span></div>
@@ -184,7 +184,7 @@ window.appState = {
     window.setActiveNavigation(null);
     renderAndRefresh(`
       <div class="page-stack">
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>›</span><button type="button" onclick="showHome()">Home</button><span>›</span><span>${window.BOTSOP_UI.escape(parent.title)}</span></nav>
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(parent.title)}</span></nav>
         <header class="process-header"><span class="process-header__icon">${window.BOTSOP_UI.icon(parent.icon || "circle-check-big")}</span><div><p>Ticket Guidance</p><h1>${window.BOTSOP_UI.escape(parent.title)}</h1><span>${window.BOTSOP_UI.escape(parent.summary || "Complete each step before closing the ticket.")}</span></div></header>
         ${parent.instruction ? window.BOTSOP_UI.markdownSection("Overview", "clipboard-check", parent.instruction) : ""}
         <section class="process-group"><header><div><h2>Ticket Guidance Steps</h2><p>Select a step to view its full guidance.</p></div></header><div class="process-grid">${steps.map(window.BOTSOP_UI.processCard).join("")}</div></section>
@@ -225,22 +225,22 @@ window.appState = {
     renderAndRefresh(`
       <article class="record-page">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
-          <button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>›</span><button type="button" onclick="showHome()">Home</button>
-          ${wrapParent ? `<span>›</span><button type="button" onclick="showWrapUp('${window.BOTSOP_UI.escape(wrapParent.id)}')">${window.BOTSOP_UI.escape(wrapParent.title)}</button>` : ""}
-          ${requestType ? `<span>›</span><button type="button" onclick="showSection('${window.BOTSOP_UI.escape(requestType.id)}')">${window.BOTSOP_UI.escape(requestType.title)}</button>` : ""}
-          <span>›</span><span>${window.BOTSOP_UI.escape(item.title)}</span>
+          <button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><button type="button" onclick="showHome()">Home</button>
+          ${wrapParent ? `<span>&rsaquo;</span><button type="button" onclick="showWrapUp('${window.BOTSOP_UI.escape(wrapParent.id)}')">${window.BOTSOP_UI.escape(wrapParent.title)}</button>` : ""}
+          ${requestType ? `<span>&rsaquo;</span><button type="button" onclick="showSection('${window.BOTSOP_UI.escape(requestType.id)}')">${window.BOTSOP_UI.escape(requestType.title)}</button>` : ""}
+          <span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(item.title)}</span>
         </nav>
         <header class="record-header">
           <span class="record-header__icon">${window.BOTSOP_UI.icon(item.icon || "file-text")}</span>
-          <div><p>${window.BOTSOP_UI.escape(item.baseSection)}</p><h1>${window.BOTSOP_UI.escape(item.title)}</h1><span>${window.BOTSOP_UI.escape(item.summary || item.description || "")}</span></div>
+          <div>${item.baseSection ? `<p>${window.BOTSOP_UI.escape(item.baseSection)}</p>` : ""}<h1>${window.BOTSOP_UI.escape(item.title)}</h1>${item.summary ? `<span>${window.BOTSOP_UI.escape(item.summary)}</span>` : ""}</div>
         </header>
         <div class="record-meta">${meta}</div>
         ${window.BOTSOP_UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
-        ${window.BOTSOP_UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance)}
         ${window.BOTSOP_UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${window.BOTSOP_UI.imageGallery(item.screenshots)}
+        ${window.BOTSOP_UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
+        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
         ${window.BOTSOP_UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay)}
         ${item.url ? `<a class="primary-action" href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${window.BOTSOP_UI.escape(item.ctaLabel)} ${window.BOTSOP_UI.icon("arrow-up-right")}</a>` : ""}
       </article>
     `);
@@ -285,7 +285,7 @@ window.appState = {
     }
     const matches = window.baseModel.search(query, window.appState.searchFilters);
     const resultDescription = query
-      ? `${matches.length} result${matches.length === 1 ? "" : "s"} for “${window.BOTSOP_UI.escape(query)}”${filterCount ? ` with ${filterCount} filter${filterCount === 1 ? "" : "s"}` : ""}`
+      ? `${matches.length} result${matches.length === 1 ? "" : "s"} for "${window.BOTSOP_UI.escape(query)}"${filterCount ? ` with ${filterCount} filter${filterCount === 1 ? "" : "s"}` : ""}`
       : `${matches.length} filtered result${matches.length === 1 ? "" : "s"}`;
     window.setActiveNavigation(null);
     renderAndRefresh(`
@@ -309,7 +309,7 @@ window.appState = {
       .filter(item => item.recordId && window.appState.favorites.has(favoriteKey(item)));
     renderAndRefresh(`
       <div class="page-stack">
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>›</span><span>My Favorites</span></nav>
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><span>My Favorites</span></nav>
         <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon("star")}</span><div><h2>My Favorites</h2><p>${matches.length} saved item${matches.length === 1 ? "" : "s"}</p></div></header>
         <div class="process-grid">${matches.map(window.BOTSOP_UI.processCard).join("")}</div>
         ${!matches.length ? `<section class="empty-state"><h2>No favorites yet</h2><p>Open an SOP or Resource and select Add to Favorites.</p></section>` : ""}
@@ -344,7 +344,7 @@ window.appState = {
     if (button) {
       button.disabled = true;
       button.classList.remove("is-sent", "is-error");
-      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")} Sending…`;
+      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")} Sending...`;
       window.BOTSOP_UI.refreshIcons();
     }
     try {
@@ -501,3 +501,5 @@ window.appState = {
 
   initializeApp();
 })();
+
+
