@@ -92,10 +92,10 @@
     return html.join("");
   };
 
-  UI.markdownSection = function markdownSection(title, iconName, value) {
+  UI.markdownSection = function markdownSection(title, iconName, value, className = "") {
     if (!value) return "";
     return `
-      <section class="detail-section formatted-content">
+      <section class="detail-section formatted-content ${UI.escape(className)}">
         <h2>${UI.icon(iconName)} ${UI.escape(title)}</h2>
         <div class="detail-section__body">${UI.markdown(value)}</div>
       </section>
@@ -325,7 +325,7 @@
   UI.relatedResourceLinks = function relatedResourceLinks(items) {
     if (!items?.length) return "";
     return `
-      <section class="detail-section">
+      <section class="detail-section detail-section--related">
         <h2>${UI.icon("link")} Related Resources</h2>
         <div class="detail-link-list">
           ${items.map(item => item.url ? `
@@ -359,7 +359,7 @@
     const linkedTasks = (tasks || []).filter(item => item?.id && !item.unresolved);
     if (!relatedResources.length && !linkedTasks.length) return "";
     return `
-      <section class="detail-section">
+      <section class="detail-section detail-section--related">
         <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
         <div class="detail-link-list">
           ${relatedResources.map(item => `
@@ -416,11 +416,11 @@
       <div class="inline-content">
         ${actionHtml}
         ${UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
-        ${UI.detailSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
-        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
-        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
+        ${UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
+        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
+        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
         ${item.url ? `<a class="primary-action compact-resource-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
       </div>
     `;
