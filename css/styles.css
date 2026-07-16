@@ -168,7 +168,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .expectation-item__body { padding: 18px 20px; color: #334155; background: #fff; }
 .expectation-item__body p { margin: 6px 0; line-height: 1.65; }
 .expectation-item__body .primary-action { margin-top: 10px; }
-.inline-content { display: grid; gap: 14px; }
+.inline-content { display: grid; gap: 18px; }
 .inline-content__empty { margin: 0; color: var(--muted); }
 .inline-content > .favorite-button { justify-self: start; }
 .inline-entry-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-self: start; }
@@ -180,6 +180,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .process-header, .record-header { display: flex; gap: 16px; align-items: center; padding: 20px; border: 1px solid #cfe0f5; border-radius: 14px; background: linear-gradient(135deg, #fff, #f4f9ff); }
 .process-header__icon, .record-header__icon { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 50%; color: var(--blue-700); background: #e5f0ff; }
 .process-header p, .record-header p { margin: 0; color: var(--blue-700); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.record-header > div > p { font-size: 12px; line-height: 1.4; }
 .process-header h1, .record-header h1 { margin: 2px 0; font-size: 25px; }
 .process-header span, .record-header span { color: var(--muted); }
 .process-group { padding: 0 0 18px; }
@@ -199,7 +200,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .process-accordion[open] > summary { background: #eef6ff; }
 .process-accordion__body { padding: 20px; border-top: 1px solid #cfe0f5; background: #fff; }
 .record-page { padding: 20px; }
-.record-page > * + * { margin-top: 16px; }
+.record-page > * + * { margin-top: 18px; }
 .record-meta { display: flex; flex-wrap: wrap; gap: 8px; }
 .record-meta span { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: #f8fafc; font-size: 11px; }
 .record-meta svg { width: 14px; }
@@ -209,13 +210,19 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .send-to-me-button:disabled { cursor: wait; opacity: .7; }
 .send-to-me-button.is-sent { border-color: #8ac89b; color: #166534; background: #effaf2; }
 .send-to-me-button.is-error { border-color: #e8a0a0; color: #991b1b; background: #fff1f2; }
-.detail-section { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
-.detail-section h2 { display: flex; align-items: center; gap: 9px; margin: 0; padding: 13px 16px; border-bottom: 1px solid var(--line); background: #f8fafc; font-size: 14px; }
+.detail-section { overflow: hidden; border: 1px solid #cbd8e8; border-radius: 12px; background: #fff; box-shadow: 0 3px 10px rgba(33, 66, 110, .04); }
+.detail-section h2 { display: flex; align-items: center; gap: 9px; margin: 0; padding: 14px 16px; border-bottom: 1px solid #cbd8e8; border-left: 4px solid #4f86cf; color: #173b6c; background: linear-gradient(90deg, #eaf3ff, #f6f9fd); font-size: 15px; font-weight: 800; }
+.detail-section h2 svg { width: 18px; height: 18px; }
 .detail-section__body { padding: 10px 16px; }
 .detail-section__body p, .detail-section__body li { line-height: 1.65; }
 .entry-priority-section .detail-section__body { font-size: 15px; line-height: 1.65; }
 .entry-priority-section .detail-section__body p,
 .entry-priority-section .detail-section__body li { font-size: inherit; }
+.detail-section--related { border-color: #a9c4e6; background: #f3f8ff; }
+.detail-section--related h2 { border-bottom-color: #b9cee8; border-left-color: #2f70c6; background: linear-gradient(90deg, #dcecff, #edf5ff); }
+.detail-section--related .detail-link-list { padding: 8px; }
+.detail-section--related .detail-link-row { margin-bottom: 7px; overflow: hidden; border: 1px solid #d5e2f2; border-radius: 9px; background: rgba(255,255,255,.92); }
+.detail-section--related .detail-link-row:last-child { margin-bottom: 0; }
 .formatted-content .detail-section__body > :first-child, .expectation-item__body > :first-child { margin-top: 0; }
 .formatted-content .detail-section__body > :last-child, .expectation-item__body > :last-child { margin-bottom: 0; }
 .formatted-content h3, .formatted-content h4, .formatted-content h5, .expectation-item__body h3, .expectation-item__body h4, .expectation-item__body h5 { margin: 18px 0 7px; line-height: 1.3; }
@@ -323,5 +330,6 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
   .assistant-link { font-size: 0; }
   .submit-resource-button { font-size: 0; padding: 7px; }
 }
+
 
 
