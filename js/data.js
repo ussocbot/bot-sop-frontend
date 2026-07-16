@@ -374,7 +374,7 @@ window.navigationItems = [];
       keywords: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
       category: textValue(findField(fields, ["Category", "Content Type", "Topic"])),
       ticketTagDisplay: textValue(findField(fields, ["Ticket Tag Display"])),
-      closingGuidance: textValue(findField(fields, ["Closing Guidance"])),
+      closingGuidance: richTextValue(findField(fields, ["Closing Guidance"])),
       workflow: textValue(findField(fields, ["Workflow"])) || "BOT"
     };
 
@@ -649,4 +649,5 @@ window.navigationItems = [];
     return window.baseModel;
   });
 })();
+
 
