@@ -56,7 +56,8 @@ function isVisible(fields) {
 
 function clipped(value, maximum = 2400) {
   const text = (typeof value === "string" ? value : textValue(value)).replace(/\r\n?/g, "\n").trim();
-  return text.length > maximum ? `${text.slice(0, maximum - 1)}â€¦` : text;
+  if (text.length > maximum) return `${text.slice(0, maximum - 3)}...`;
+  return text;
 }
 
 function safeLink(url) {
@@ -216,6 +217,11 @@ module.exports = async function sendToMe(req, res) {
       markdownSection("Ticket Tags", ticketTagDisplay, 800)
     ].filter(Boolean);
 
+    const relatedLinksText = relatedLinks
+      .slice(0, 20)
+      .map(item => `- [${item.title.replace(/[\[\]]/g, "")}](${safeLink(item.url)})`)
+      .join("\n");
+
     if (relatedLinks.length) {
       if (elements.length) elements.push(divider());
       elements.push({
@@ -224,8 +230,9 @@ module.exports = async function sendToMe(req, res) {
           tag: "lark_md",
           content: `**Related Resources & Tasks**\n${relatedLinks
             .slice(0, 20)
-            .map(item => `â€¢ [${item.title.replace(/[\[\]]/g, "")}](${safeLink(item.url)})`)
-            .join("\n")}`
+            .map(item => `- [${item.title.replace(/[\[\]]/g, "")}](${safeLink(item.url)})`)
+            .join("\n")}`,
+          content: `**Related Resources & Tasks**\n${relatedLinksText}`
         }
       });
     }
