@@ -172,7 +172,7 @@
         <header><h2>Submit an Update</h2><p>Submit an SOP change, Important News item, or Macro Update for Base review.</p></header>
         <form class="submission-form" id="update-submission-form">
           <div class="submission-grid">
-            <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="SOP Update">SOP Update</option><option value="Important News">Important News</option><option value="Macro Update">Macro Update</option></select></label>
+            <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="sop" selected>SOP Update</option><option value="important_news">Important News</option><option value="macro_update">Macro Update</option></select><small id="update-type-confirmation">SOP workflow fields are active.</small></label>
             <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select></label>
             <label class="submission-field submission-field--wide"><span>Proposed Content Name</span><input id="update-title" maxlength="300" required></label>
             <div data-sop-only class="submission-conditional-wide">${selectorHtml("update-workflow", true)}</div>
@@ -421,7 +421,9 @@
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector("button[type=submit]");
-    const updateType = document.getElementById("update-type").value;
+    const updateTypeCode = document.getElementById("update-type").value;
+    const updateTypeLabels = { sop: "SOP Update", important_news: "Important News", macro_update: "Macro Update" };
+    const updateType = updateTypeLabels[updateTypeCode] || "SOP Update";
     const submissionType = document.getElementById("update-submission-type").value;
     const workflow = workflowSelection("update-workflow");
     if (updateType === "SOP Update" && submissionType !== "New SOP" && !workflow.targetRecordId) {
@@ -437,7 +439,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           kind: "update",
-          updateType,
+          updateType: updateTypeCode,
           submissionType,
           title: document.getElementById("update-title").value,
           summary: document.getElementById("update-summary").value,
@@ -455,7 +457,7 @@
           screenshotTokens
         })
       });
-      showSuccess(updateType.toLowerCase(), document.getElementById("update-title").value, result.recordId);
+      showSuccess((result.updateType || updateType).toLowerCase(), document.getElementById("update-title").value, result.recordId);
     } catch (error) {
       setStatus("update-status", error.message, "error");
     } finally {
@@ -464,10 +466,21 @@
   }
 
   function syncUpdateType() {
-    const updateType = document.getElementById("update-type")?.value || "SOP Update";
-    const sopMode = updateType === "SOP Update";
-    document.querySelectorAll("[data-sop-only]").forEach(element => { element.hidden = !sopMode; });
-    document.querySelectorAll("[data-announcement-only]").forEach(element => { element.hidden = sopMode; });
+    const updateType = document.getElementById("update-type")?.value || "sop";
+    const sopMode = updateType === "sop";
+    const form = document.getElementById("update-submission-form");
+    form?.querySelectorAll("[data-sop-only]").forEach(element => {
+      element.hidden = !sopMode;
+      element.style.display = sopMode ? "" : "none";
+    });
+    form?.querySelectorAll("[data-announcement-only]").forEach(element => {
+      element.hidden = sopMode;
+      element.style.display = sopMode ? "none" : "";
+    });
+    const confirmation = document.getElementById("update-type-confirmation");
+    if (confirmation) confirmation.textContent = sopMode
+      ? "SOP workflow fields are active."
+      : `${updateType === "important_news" ? "Important News" : "Macro Update"} announcement fields are active.`;
     const category = document.getElementById("update-workflow-category");
     if (category) category.required = sopMode;
     const date = document.getElementById("update-publish-date");
