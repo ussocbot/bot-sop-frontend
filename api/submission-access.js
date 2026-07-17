@@ -13,7 +13,8 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       configured: access.configured,
       canSubmitResources: access.canSubmitResources,
-      canSubmitSopUpdates: access.canSubmitSopUpdates
+      canSubmitUpdates: access.canSubmitUpdates,
+      canSubmitSopUpdates: access.canSubmitUpdates
     });
   } catch (error) {
     console.error("Submission access check failed", error);
