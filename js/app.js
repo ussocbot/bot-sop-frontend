@@ -19,11 +19,30 @@ window.appState = {
     if (!target) return;
     target.innerHTML = html;
     target.querySelectorAll("details[data-accordion-group]").forEach(details => {
+      const summary = details.querySelector(":scope > summary");
+      const rememberAnchor = () => {
+        details.__anchorTop = summary?.getBoundingClientRect().top;
+      };
+      summary?.addEventListener("pointerdown", rememberAnchor);
+      summary?.addEventListener("keydown", event => {
+        if (["Enter", " "].includes(event.key)) rememberAnchor();
+      });
       details.addEventListener("toggle", () => {
         if (!details.open) return;
+        const anchorTop = Number.isFinite(details.__anchorTop)
+          ? details.__anchorTop
+          : summary?.getBoundingClientRect().top;
         const group = details.dataset.accordionGroup;
         target.querySelectorAll(`details[data-accordion-group="${group}"][open]`).forEach(other => {
           if (other !== details) other.open = false;
+        });
+        window.requestAnimationFrame(() => {
+          if (!summary || !details.open) return;
+          summary.focus({ preventScroll: true });
+          if (!Number.isFinite(anchorTop)) return;
+          const movement = summary.getBoundingClientRect().top - anchorTop;
+          if (Math.abs(movement) > 1) window.scrollBy({ top: movement, left: 0, behavior: "auto" });
+          details.__anchorTop = undefined;
         });
       });
     });
@@ -473,6 +492,7 @@ window.appState = {
     try {
       await window.baseDataReady;
       await loadFavorites();
+      await window.BOTSOP_SUBMISSIONS?.loadAccess?.();
       window.buildLeftNavigation();
       window.BOTSOP_UI.renderRightRail(window.baseModel);
       window.BOTSOP_UI.installImageViewer();
@@ -486,12 +506,22 @@ window.appState = {
         assistant.hidden = false;
       }
       const submitResource = document.getElementById("submit-resource");
-      if (submitResource && window.baseMeta?.submitResourceUrl) {
+      if (submitResource && window.BOTSOP_SUBMISSIONS?.hasAnyAccess?.()) {
+        submitResource.href = "?page=submit";
+        submitResource.removeAttribute("target");
+        submitResource.removeAttribute("rel");
+        submitResource.hidden = false;
+      } else if (submitResource && window.baseMeta?.submitResourceUrl) {
         submitResource.href = window.baseMeta.submitResourceUrl;
+        submitResource.target = "_blank";
+        submitResource.rel = "noopener noreferrer";
         submitResource.hidden = false;
       }
+      const requestedPage = new URLSearchParams(window.location.search).get("page");
       const requestedRecord = new URLSearchParams(window.location.search).get("record");
-      if (requestedRecord && window.baseModel.find(requestedRecord)) window.showRecord(requestedRecord, false);
+      if (requestedPage === "submit" && window.BOTSOP_SUBMISSIONS?.showSubmissionCenter) {
+        window.BOTSOP_SUBMISSIONS.showSubmissionCenter();
+      } else if (requestedRecord && window.baseModel.find(requestedRecord)) window.showRecord(requestedRecord, false);
       else window.showHome(false);
     } catch (error) {
       console.error("BOT SOP startup failed", error);
@@ -501,5 +531,3 @@ window.appState = {
 
   initializeApp();
 })();
-
-
