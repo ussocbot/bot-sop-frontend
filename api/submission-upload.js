@@ -37,8 +37,8 @@ module.exports = async function handler(req, res) {
     const kind = String(body.kind || "").toLowerCase();
     const allowed = kind === "resource"
       ? access.canSubmitResources
-      : kind === "sop"
-        ? access.canSubmitSopUpdates
+      : ["sop", "update"].includes(kind)
+        ? access.canSubmitUpdates
         : false;
     if (!allowed) return res.status(403).json({ error: "You do not have permission to upload this file." });
 
