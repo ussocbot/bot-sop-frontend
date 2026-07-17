@@ -326,6 +326,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .submission-tab.is-active { color: #fff; background: #135fca; box-shadow: 0 5px 14px rgba(19,95,202,.2); }
 .submission-panel { padding: 22px; border: 1px solid #cbd8e8; border-radius: 14px; background: #fff; box-shadow: var(--shadow); }
 .submission-panel[hidden] { display: none; }
+.submission-form [hidden] { display: none !important; }
 .submission-panel > header { margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .submission-panel > header h2 { margin: 0; font-size: 19px; }
 .submission-panel > header p { margin: 4px 0 0; color: var(--muted); }
