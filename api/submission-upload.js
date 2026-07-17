@@ -39,7 +39,9 @@ module.exports = async function handler(req, res) {
       ? access.canSubmitResources
       : ["sop", "update"].includes(kind)
         ? access.canSubmitUpdates
-        : false;
+        : kind === "review"
+          ? access.canReviewUpdates
+          : false;
     if (!allowed) return res.status(403).json({ error: "You do not have permission to upload this file." });
 
     const mimeType = String(body.mimeType || "").toLowerCase();

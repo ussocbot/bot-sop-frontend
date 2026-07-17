@@ -127,7 +127,7 @@
     return age >= 0 && age <= 7 * 24 * 60 * 60 * 1000 ? "New" : "";
   };
 
-  UI.sidebarCard = function sidebarCard(title, iconName, items, tone, collapsible = false) {
+  UI.sidebarCard = function sidebarCard(title, iconName, items, tone, collapsible = false, viewAllKey = "", totalCount = items.length) {
     const showDescriptions = !["BOT Tools", "OPUS Links", "QA Links"].includes(title);
     const cardTag = collapsible ? "details" : "section";
     const headerTag = collapsible ? "summary" : "header";
@@ -135,7 +135,7 @@
       <${cardTag} class="side-card side-card--${UI.escape(tone)}${collapsible ? " side-card--collapsible" : ""}"${collapsible ? ` data-right-card-accordion="utilities"` : ""}>
         <${headerTag} class="side-card__header">
           <span>${UI.icon(iconName)} ${UI.escape(title)}</span>
-          <span class="side-card__header-meta"><small>${items.length} item${items.length === 1 ? "" : "s"}</small>${collapsible ? UI.icon("chevron-down", "side-card__chevron") : ""}</span>
+          <span class="side-card__header-meta"><small>${totalCount} item${totalCount === 1 ? "" : "s"}</small>${collapsible ? UI.icon("chevron-down", "side-card__chevron") : ""}</span>
         </${headerTag}>
         <div class="side-card__items">
           ${items.length ? items.map(item => {
@@ -150,6 +150,7 @@
             </a>
           `; }).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
         </div>
+        ${viewAllKey && totalCount ? `<button type="button" class="side-card__view-all" onclick="showUpdateArchive('${UI.escape(viewAllKey)}')">View All ${UI.icon("arrow-right")}</button>` : ""}
       </${cardTag}>
     `;
   };
@@ -158,9 +159,22 @@
     const rail = document.getElementById("right-rail");
     if (!rail) return;
     const unique = items => [...new Map(items.map(item => [item.id, item])).values()];
+    const newestFirst = items => unique(items).sort((a, b) => {
+      const parse = value => {
+        const raw = String(value || "").trim();
+        if (/^\d{10,13}$/.test(raw)) return raw.length === 10 ? Number(raw) * 1000 : Number(raw);
+        const parsed = Date.parse(raw);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+      return parse(b.publishDate || b.lastUpdated) - parse(a.publishDate || a.lastUpdated) || (b.priority || 0) - (a.priority || 0) || a.title.localeCompare(b.title);
+    });
+    const importantNews = newestFirst([...model.featuredFor("Important News"), ...model.section("News", "Important News")]);
+    const sopUpdates = newestFirst([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]);
+    const macroUpdates = newestFirst(model.section("Macro Update", "Macro Updates"));
     rail.innerHTML = [
-      UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "red"),
-      UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "yellow"),
+      UI.sidebarCard("Important News", "megaphone", importantNews.slice(0, 4), "red", false, "important-news", importantNews.length),
+      UI.sidebarCard("SOP Updates", "file-clock", sopUpdates.slice(0, 4), "yellow", false, "sop-updates", sopUpdates.length),
+      macroUpdates.length ? UI.sidebarCard("Macro Updates", "message-square-more", macroUpdates.slice(0, 4), "teal", false, "macro-updates", macroUpdates.length) : "",
       UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
       UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
       UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal", true)

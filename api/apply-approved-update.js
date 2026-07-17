@@ -137,6 +137,7 @@ async function writeRecord(config, tableId, fields, recordId = "") {
 function proposedContent(fields) {
   const title = textValue(findField(fields, ["Proposed Content Name"]));
   const screenshots = attachmentTokens(findField(fields, ["Screenshots"]));
+  const screenshotAction = textValue(findField(fields, ["Screenshot Action"])) || "Keep Existing";
   const liveFields = {
     "Content Name": title,
     "Content Summary": textValue(findField(fields, ["Proposed Content Summary"])),
@@ -144,7 +145,10 @@ function proposedContent(fields) {
     "Closing Guidance": textValue(findField(fields, ["Proposed Closing Guidance"])),
     "Ticket Tag Display": textValue(findField(fields, ["Proposed Ticket Tag Display"]))
   };
-  if (screenshots.length) liveFields.Screenshots = screenshots.map(fileToken => ({ file_token: fileToken }));
+  if (screenshotAction === "Remove Existing") liveFields.Screenshots = [];
+  if (screenshotAction === "Replace Existing" && screenshots.length) {
+    liveFields.Screenshots = screenshots.map(fileToken => ({ file_token: fileToken }));
+  }
   return { title, liveFields };
 }
 

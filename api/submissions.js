@@ -216,6 +216,13 @@ module.exports = async function handler(req, res) {
       const screenshots = fileTokens(body.screenshotTokens);
       const groupId = recordId(body.workflowGroupId);
       const publishDate = dateValue(body.publishDate);
+      const requestedScreenshotAction = text(body.screenshotAction, 100);
+      const allowedScreenshotActions = new Set(["Keep Existing", "Remove Existing", "Replace Existing"]);
+      fields["Screenshot Action"] = screenshots.length
+        ? "Replace Existing"
+        : (allowedScreenshotActions.has(requestedScreenshotAction)
+            ? requestedScreenshotAction
+            : (updateType === "SOP Update" && submissionType !== "New SOP" ? "Keep Existing" : "Remove Existing"));
       if (suggestedSopId) fields["Suggested Existing SOP"] = [suggestedSopId];
       if (groupId) fields["Proposed Parent"] = [groupId];
       if (proposedUrl) fields["Proposed URL"] = { link: proposedUrl, text: title };

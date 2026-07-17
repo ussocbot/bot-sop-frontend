@@ -48,7 +48,7 @@
   }
 
   function hasAnyAccess() {
-    return Boolean(state.access?.canSubmitResources || state.access?.canSubmitUpdates || state.access?.canSubmitSopUpdates);
+    return Boolean(state.access?.canSubmitResources || state.access?.canSubmitUpdates || state.access?.canSubmitSopUpdates || state.access?.canReviewUpdates);
   }
 
   function itemAppearsIn(item, placement) {
@@ -172,8 +172,10 @@
         <header><h2>Submit an Update</h2><p>Submit an SOP change, Important News item, or Macro Update for Base review.</p></header>
         <form class="submission-form" id="update-submission-form">
           <div class="submission-grid">
-            <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="sop" selected>SOP Update</option><option value="important_news">Important News</option><option value="macro_update">Macro Update</option></select><small id="update-type-confirmation">SOP workflow fields are active.</small></label>
-            <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select></label>
+            <div class="submission-type-row">
+              <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="sop" selected>SOP Update</option><option value="important_news">Important News</option><option value="macro_update">Macro Update</option></select><small id="update-type-confirmation">SOP workflow fields are active.</small></label>
+              <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select><small>Choose whether this replaces existing guidance or creates a new SOP.</small></label>
+            </div>
             <label class="submission-field submission-field--wide"><span>Proposed Content Name</span><input id="update-title" maxlength="300" required></label>
             <div data-sop-only class="submission-conditional-wide">${selectorHtml("update-workflow", true)}</div>
             <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="update-summary" maxlength="2000" required></textarea></label>
@@ -183,7 +185,7 @@
             <label class="submission-field" data-announcement-only hidden><span>Publish Date</span><input id="update-publish-date" type="date"></label>
             <label class="submission-field" data-announcement-only hidden><span>Resource Link</span><input id="update-url" type="url" placeholder="https://"></label>
             <label class="submission-field submission-field--wide"><span>Reason for Change</span><textarea id="update-reason" maxlength="5000" required></textarea></label>
-            <label class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><input id="update-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="update-screenshot-list"></span></label>
+            <section class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><div id="update-screenshot-options" class="submission-screenshot-options"><label><input type="radio" name="update-screenshot-action" value="Keep Existing" checked> Keep existing screenshots</label><label><input type="radio" name="update-screenshot-action" value="Remove Existing"> Remove existing screenshots</label></div><input id="update-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="update-screenshot-list"></span></section>
           </div>
           <div class="submission-form__actions"><span class="submission-status" id="update-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit Update</button></div>
         </form>
@@ -241,17 +243,21 @@
       group.innerHTML = groups.length
         ? optionList(groups, "All workflows in this section")
         : `<option value="">No additional workflow level</option>`;
-      const targets = category.value ? targetChoices(category.value, "") : [];
+      const targets = category.value && !groups.length ? targetChoices(category.value, "") : [];
       target.disabled = !targets.length;
-      target.innerHTML = optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
+      target.innerHTML = groups.length
+        ? `<option value="">Select a workflow family first</option>`
+        : optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
       preview.innerHTML = "";
       updatePath();
     });
 
     group.addEventListener("change", () => {
-      const targets = targetChoices(category.value, group.value);
+      const targets = group.value ? targetChoices(category.value, group.value) : [];
       target.disabled = !targets.length;
-      target.innerHTML = optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
+      target.innerHTML = group.value
+        ? optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance")
+        : `<option value="">Select a workflow family first</option>`;
       preview.innerHTML = "";
       updatePath();
     });
@@ -307,6 +313,10 @@
     const list = document.getElementById(listId);
     input?.addEventListener("change", () => {
       const files = [...input.files];
+      if (inputId === "update-screenshots" && files.length) {
+        const keep = document.querySelector('input[name="update-screenshot-action"][value="Keep Existing"]');
+        if (keep) keep.checked = false;
+      }
       list.innerHTML = files.length ? files.map(file => `<span>${escape(file.name)} - ${Math.ceil(file.size / 1024)} KB</span>`).join("") : "";
     });
   }
@@ -454,6 +464,7 @@
           workflowGroup: workflow.group,
           workflowGroupId: workflow.groupRecordId,
           suggestedSopId: workflow.targetRecordId,
+          screenshotAction: document.querySelector('input[name="update-screenshot-action"]:checked')?.value || (screenshotTokens.length ? "Replace Existing" : "Keep Existing"),
           screenshotTokens
         })
       });
@@ -469,6 +480,7 @@
     const updateType = document.getElementById("update-type")?.value || "sop";
     const sopMode = updateType === "sop";
     const form = document.getElementById("update-submission-form");
+    form?.classList.toggle("is-announcement-mode", !sopMode);
     form?.querySelectorAll("[data-sop-only]").forEach(element => {
       element.hidden = !sopMode;
       element.style.display = sopMode ? "" : "none";
@@ -485,6 +497,14 @@
     if (category) category.required = sopMode;
     const date = document.getElementById("update-publish-date");
     if (!sopMode && date && !date.value) date.value = new Date().toISOString().slice(0, 10);
+    syncScreenshotOptions();
+  }
+
+  function syncScreenshotOptions() {
+    const type = document.getElementById("update-submission-type")?.value || "Update Existing SOP";
+    const options = document.getElementById("update-screenshot-options");
+    if (!options) return;
+    options.hidden = type === "New SOP" || document.getElementById("update-type")?.value !== "sop";
   }
 
   function activateTab(tab) {
@@ -492,8 +512,10 @@
     document.querySelectorAll(".submission-tab").forEach(button => button.classList.toggle("is-active", button.dataset.tab === tab));
     const resource = document.getElementById("submission-resource-panel");
     const update = document.getElementById("submission-update-panel");
+    const review = document.getElementById("submission-review-panel");
     if (resource) resource.hidden = tab !== "resource";
     if (update) update.hidden = tab !== "update";
+    if (review) review.hidden = tab !== "review";
   }
 
   function bindPage() {
@@ -506,6 +528,8 @@
     document.getElementById("resource-submission-form")?.addEventListener("submit", submitResource);
     document.getElementById("update-submission-form")?.addEventListener("submit", submitUpdate);
     document.getElementById("update-type")?.addEventListener("change", syncUpdateType);
+    document.getElementById("update-submission-type")?.addEventListener("change", syncScreenshotOptions);
+    window.BOTSOP_REVIEWS?.bindPage?.();
     syncUpdateType();
     UI().refreshIcons();
   }
@@ -528,14 +552,21 @@
 
     const resourceAllowed = state.access.canSubmitResources;
     const updateAllowed = state.access.canSubmitUpdates || state.access.canSubmitSopUpdates;
-    state.activeTab = resourceAllowed ? "resource" : "update";
+    const reviewAllowed = state.access.canReviewUpdates;
+    state.activeTab = resourceAllowed ? "resource" : (updateAllowed ? "update" : "review");
+    const tabs = [
+      resourceAllowed ? `<button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button>` : "",
+      updateAllowed ? `<button type="button" class="submission-tab" data-tab="update">${UI().icon("workflow")} Submit Update</button>` : "",
+      reviewAllowed ? `<button type="button" class="submission-tab" data-tab="review">${UI().icon("clipboard-check")} Review Updates</button>` : ""
+    ].filter(Boolean);
     target.innerHTML = `
       <div class="submission-page">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Submission Center</span></nav>
         <header class="submission-hero"><span class="submission-hero__icon">${UI().icon("file-plus-2")}</span><div><h1>Submission Center</h1><p>Submit formatted resources, SOP changes, Important News, and Macro Updates for review.</p></div></header>
-        ${resourceAllowed && updateAllowed ? `<div class="submission-tabs"><button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button><button type="button" class="submission-tab" data-tab="update">${UI().icon("workflow")} Submit Update</button></div>` : ""}
+        ${tabs.length > 1 ? `<div class="submission-tabs">${tabs.join("")}</div>` : ""}
         ${resourceAllowed ? resourceFormHtml() : ""}
         ${updateAllowed ? updateFormHtml() : ""}
+        ${reviewAllowed ? window.BOTSOP_REVIEWS.panelHtml() : ""}
       </div>
     `;
     bindPage();

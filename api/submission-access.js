@@ -14,7 +14,8 @@ module.exports = async function handler(req, res) {
       configured: access.configured,
       canSubmitResources: access.canSubmitResources,
       canSubmitUpdates: access.canSubmitUpdates,
-      canSubmitSopUpdates: access.canSubmitUpdates
+      canSubmitSopUpdates: access.canSubmitUpdates,
+      canReviewUpdates: access.canReviewUpdates
     });
   } catch (error) {
     console.error("Submission access check failed", error);

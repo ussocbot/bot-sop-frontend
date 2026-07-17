@@ -15,6 +15,7 @@ window.navigationItems = [];
     link: "Link",
     news: "News",
     "sop update": "SOP Update",
+    "macro update": "Macro Update",
     warning: "Warning"
   };
 
@@ -31,6 +32,7 @@ window.navigationItems = [];
     "qa links": "QA Links",
     "important news": "Important News",
     "sop updates": "SOP Updates",
+    "macro updates": "Macro Updates",
     "policy reminders": "Policy Reminders"
   };
 
@@ -84,6 +86,7 @@ window.navigationItems = [];
     "Link|QA Links": "right QA Links card",
     "News|Important News": "right Important News card",
     "SOP Update|SOP Updates": "right SOP Updates card",
+    "Macro Update|Macro Updates": "right Macro Updates card",
     "Warning|Policy Reminders": "bottom-wide policy reminder"
   };
 

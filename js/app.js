@@ -150,6 +150,40 @@ window.appState = {
     `);
   };
 
+  window.showUpdateArchive = function showUpdateArchive(type, addToHistory = true) {
+    const model = window.baseModel;
+    if (!model) return;
+    const config = {
+      "important-news": { title: "Important News", icon: "megaphone", items: [...model.featuredFor("Important News"), ...model.section("News", "Important News")] },
+      "sop-updates": { title: "SOP Updates", icon: "file-clock", items: [...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")] },
+      "macro-updates": { title: "Macro Updates", icon: "message-square-more", items: model.section("Macro Update", "Macro Updates") }
+    }[type];
+    if (!config) return;
+    if (addToHistory) remember("updates", type);
+    else {
+      window.appState.currentView = "updates";
+      window.appState.currentSection = type;
+      window.appState.currentQuery = "";
+    }
+    const unique = [...new Map(config.items.map(item => [item.id, item])).values()];
+    const parseDate = value => {
+      const raw = String(value || "").trim();
+      if (/^\d{10,13}$/.test(raw)) return raw.length === 10 ? Number(raw) * 1000 : Number(raw);
+      const parsed = Date.parse(raw);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const items = unique.sort((a, b) => parseDate(b.publishDate || b.lastUpdated) - parseDate(a.publishDate || a.lastUpdated) || a.title.localeCompare(b.title));
+    window.setActiveNavigation(null);
+    renderAndRefresh(`
+      <div class="page-stack">
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(config.title)}</span></nav>
+        <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon(config.icon)}</span><div><h2>${window.BOTSOP_UI.escape(config.title)}</h2><p>${items.length} active update${items.length === 1 ? "" : "s"}, newest first.</p></div></header>
+        <div class="process-grid">${items.map(window.BOTSOP_UI.processCard).join("")}</div>
+        ${!items.length ? `<section class="empty-state"><h2>No updates available</h2><p>Published updates will appear here.</p></section>` : ""}
+      </div>
+    `);
+  };
+
   window.showSection = function showSection(sectionId, addToHistory = true) {
     const model = window.baseModel;
     const requestType = model?.requestTypes.find(item => item.id === sectionId || item.recordKey === sectionId);
@@ -272,6 +306,7 @@ window.appState = {
     if (prior.view === "wrap") return window.showWrapUp(prior.id, false);
     if (prior.view === "search") return window.showSearch(prior.query, false, prior.scrollY);
     if (prior.view === "favorites") return window.showFavorites(false);
+    if (prior.view === "updates") return window.showUpdateArchive(prior.id, false);
     return window.showRecord(prior.id, false);
   };
 
