@@ -42,6 +42,13 @@ function safeUrl(value) {
   }
 }
 
+function dateValue(value) {
+  const raw = text(value, 100);
+  if (!raw) return null;
+  const parsed = Date.parse(`${raw}T12:00:00Z`);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 async function createRecord(access, tableId, fields) {
   const url = new URL(
     `/open-apis/bitable/v1/apps/${encodeURIComponent(access.appToken)}` +
@@ -121,9 +128,9 @@ module.exports = async function handler(req, res) {
       return res.status(201).json({ ok: true, recordId: record.record_id || record.id || "" });
     }
 
-    if (kind === "sop") {
-      if (!access.canSubmitSopUpdates) {
-        return res.status(403).json({ error: "You do not have permission to submit SOP updates." });
+    if (kind === "update" || kind === "sop") {
+      if (!access.canSubmitUpdates) {
+        return res.status(403).json({ error: "You do not have permission to submit updates." });
       }
 
       const tableId = process.env.FEISHU_SOP_UPDATE_REQUESTS_TABLE_ID;
@@ -131,23 +138,35 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: "The SOP Update Requests table is not configured." });
       }
 
+      const updateType = kind === "sop" ? "SOP Update" : text(body.updateType, 100);
+      const allowedUpdateTypes = new Set(["SOP Update", "Important News", "Macro Update"]);
+      if (!allowedUpdateTypes.has(updateType)) {
+        return res.status(400).json({ error: "Select a valid update type." });
+      }
+
       const submissionType = text(body.submissionType, 100);
       const allowedTypes = new Set(["New SOP", "Update Existing SOP", "Correction"]);
-      if (!allowedTypes.has(submissionType)) {
+      if (updateType === "SOP Update" && !allowedTypes.has(submissionType)) {
         return res.status(400).json({ error: "Select a valid submission type." });
       }
 
       const title = text(body.title, 500);
       const suggestedSopId = recordId(body.suggestedSopId);
       if (!title) return res.status(400).json({ error: "Proposed content name is required." });
-      if (submissionType !== "New SOP" && !suggestedSopId) {
+      if (updateType === "SOP Update" && submissionType !== "New SOP" && !suggestedSopId) {
         return res.status(400).json({ error: "Select the existing SOP this request should update." });
       }
 
+      const proposedUrl = safeUrl(body.url);
+      if (text(body.url) && !proposedUrl) {
+        return res.status(400).json({ error: "Resource Link must be a valid web address." });
+      }
+
       const fields = {
-        "Request Name": `${submissionType}: ${title}`.slice(0, 500),
-        "Submission Type": submissionType,
+        "Request Name": `${updateType}: ${title}`.slice(0, 500),
+        "Update Type": updateType,
         "Workflow Path": text(body.workflowPath, 2000),
+        "Proposed Request Type": text(body.workflowCategory, 500),
         "Proposed Content Name": title,
         "Proposed Content Summary": text(body.summary, 5000),
         "Proposed Instructions": text(body.instruction),
@@ -156,10 +175,17 @@ module.exports = async function handler(req, res) {
         "Reason for Change": text(body.reason, 10000),
         "Submitted By": submitter(access.session.openId),
         "Submitted At": Date.now(),
-        "Review Status": "Pending Review"
+        "Review Status": "Pending Review",
+        "Apply Status": "Pending"
       };
+      if (updateType === "SOP Update") fields["Submission Type"] = submissionType;
       const screenshots = fileTokens(body.screenshotTokens);
+      const groupId = recordId(body.workflowGroupId);
+      const publishDate = dateValue(body.publishDate);
       if (suggestedSopId) fields["Suggested Existing SOP"] = [suggestedSopId];
+      if (groupId) fields["Proposed Parent"] = [groupId];
+      if (proposedUrl) fields["Proposed URL"] = { link: proposedUrl, text: title };
+      if (publishDate) fields["Proposed Publish Date"] = publishDate;
       if (screenshots.length) fields.Screenshots = attachmentFields(screenshots);
 
       const record = await createRecord(access, tableId, fields);
