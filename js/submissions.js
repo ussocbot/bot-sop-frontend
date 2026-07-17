@@ -39,7 +39,7 @@
         state.access = {
           configured: false,
           canSubmitResources: false,
-          canSubmitSopUpdates: false,
+          canSubmitUpdates: false,
           error: error.message
         };
         return state.access;
@@ -48,7 +48,7 @@
   }
 
   function hasAnyAccess() {
-    return Boolean(state.access?.canSubmitResources || state.access?.canSubmitSopUpdates);
+    return Boolean(state.access?.canSubmitResources || state.access?.canSubmitUpdates || state.access?.canSubmitSopUpdates);
   }
 
   function itemAppearsIn(item, placement) {
@@ -166,23 +166,26 @@
     `;
   }
 
-  function sopFormHtml() {
+  function updateFormHtml() {
     return `
-      <section class="submission-panel" id="submission-sop-panel">
-        <header><h2>Submit an SOP Workflow Update</h2><p>The live SOP will not change until a reviewer verifies and approves this request.</p></header>
-        <form class="submission-form" id="sop-submission-form">
+      <section class="submission-panel" id="submission-update-panel">
+        <header><h2>Submit an Update</h2><p>Submit an SOP change, Important News item, or Macro Update for Base review.</p></header>
+        <form class="submission-form" id="update-submission-form">
           <div class="submission-grid">
-            <label class="submission-field"><span>Submission Type</span><select id="sop-submission-type" required><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select></label>
-            <label class="submission-field"><span>Proposed Content Name</span><input id="sop-title" maxlength="300" required></label>
-            ${selectorHtml("sop-workflow", true)}
-            <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="sop-summary" maxlength="2000" required></textarea></label>
-            ${editorHtml("sop-instruction", "Proposed Instructions", true)}
-            ${editorHtml("sop-closing", "Proposed Closing Guidance", false)}
-            <label class="submission-field submission-field--wide"><span>Proposed Ticket Tag Display</span><textarea id="sop-ticket-tags" maxlength="3000" placeholder="Tags that should be displayed to the agent"></textarea></label>
-            <label class="submission-field submission-field--wide"><span>Reason for Change</span><textarea id="sop-reason" maxlength="5000" required></textarea></label>
-            <label class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><input id="sop-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="sop-screenshot-list"></span></label>
+            <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="SOP Update">SOP Update</option><option value="Important News">Important News</option><option value="Macro Update">Macro Update</option></select></label>
+            <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select></label>
+            <label class="submission-field submission-field--wide"><span>Proposed Content Name</span><input id="update-title" maxlength="300" required></label>
+            <div data-sop-only class="submission-conditional-wide">${selectorHtml("update-workflow", true)}</div>
+            <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="update-summary" maxlength="2000" required></textarea></label>
+            ${editorHtml("update-instruction", "Proposed Instructions / Message", true)}
+            <div data-sop-only class="submission-conditional-wide">${editorHtml("update-closing", "Proposed Closing Guidance", false)}</div>
+            <label class="submission-field submission-field--wide" data-sop-only><span>Proposed Ticket Tag Display</span><textarea id="update-ticket-tags" maxlength="3000" placeholder="Tags that should be displayed to the agent"></textarea></label>
+            <label class="submission-field" data-announcement-only hidden><span>Publish Date</span><input id="update-publish-date" type="date"></label>
+            <label class="submission-field" data-announcement-only hidden><span>Resource Link</span><input id="update-url" type="url" placeholder="https://"></label>
+            <label class="submission-field submission-field--wide"><span>Reason for Change</span><textarea id="update-reason" maxlength="5000" required></textarea></label>
+            <label class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><input id="update-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="update-screenshot-list"></span></label>
           </div>
-          <div class="submission-form__actions"><span class="submission-status" id="sop-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit SOP Update</button></div>
+          <div class="submission-form__actions"><span class="submission-status" id="update-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit Update</button></div>
         </form>
       </section>
     `;
@@ -255,8 +258,8 @@
 
     target.addEventListener("change", () => {
       updatePath();
-      if (prefix === "sop-workflow" && target.value) {
-        const title = document.getElementById("sop-title");
+      if (prefix === "update-workflow" && target.value) {
+        const title = document.getElementById("update-title");
         if (title && !title.value.trim()) title.value = selectedText(target);
       }
     });
@@ -344,6 +347,43 @@
       .join(" > ");
   }
 
+  function workflowSelection(prefix) {
+    const category = document.getElementById(`${prefix}-category`)?.value || "";
+    const group = document.getElementById(`${prefix}-group`)?.value || "";
+    const targetRecordId = document.getElementById(`${prefix}-target`)?.value || "";
+    const groupRecord = (window.baseModel?.items || []).find(item =>
+      item.displayType === "Process Group" && key(item.title) === key(group)
+    );
+    return {
+      path: workflowPath(prefix),
+      category,
+      group,
+      groupRecordId: groupRecord?.recordId || "",
+      targetRecordId
+    };
+  }
+
+  function showSuccess(kind, title, recordId) {
+    const target = document.getElementById("content-view");
+    if (!target) return;
+    target.innerHTML = `
+      <section class="submission-success-page">
+        <span class="submission-success-page__icon">${UI().icon("circle-check-big")}</span>
+        <p class="submission-success-page__eyebrow">Submission Received</p>
+        <h1>${escape(title)}</h1>
+        <p>Your ${escape(kind)} was saved successfully and is now pending review.</p>
+        ${recordId ? `<div class="submission-reference"><span>Reference ID</span><code>${escape(recordId)}</code></div>` : ""}
+        <div class="submission-success-page__actions">
+          <button type="button" class="primary-action" id="submit-another">Submit Another</button>
+          <button type="button" class="secondary-action" onclick="showHome()">Return to BOT SOP</button>
+        </div>
+      </section>
+    `;
+    document.getElementById("submit-another")?.addEventListener("click", showSubmissionCenter);
+    UI().refreshIcons();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function submitResource(event) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -353,7 +393,7 @@
       setStatus("resource-status", "Preparing submission...");
       const screenshotTokens = await uploadScreenshots(document.getElementById("resource-screenshots"), "resource", "resource-status");
       const keywords = document.getElementById("resource-keywords").value.split(",").map(value => value.trim()).filter(Boolean);
-      await request("/api/submissions", {
+      const result = await request("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -369,9 +409,7 @@
           screenshotTokens
         })
       });
-      setStatus("resource-status", "Resource submitted for review.", "success");
-      form.reset();
-      document.getElementById("resource-instruction").dispatchEvent(new Event("input"));
+      showSuccess("resource", document.getElementById("resource-title").value, result.recordId);
     } catch (error) {
       setStatus("resource-status", error.message, "error");
     } finally {
@@ -379,66 +417,83 @@
     }
   }
 
-  async function submitSopUpdate(event) {
+  async function submitUpdate(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const button = form.querySelector("button[type=submit]");
-    const submissionType = document.getElementById("sop-submission-type").value;
-    const targetRecordId = document.getElementById("sop-workflow-target").value;
-    if (submissionType !== "New SOP" && !targetRecordId) {
-      setStatus("sop-status", "Select the existing guidance that this request should update.", "error");
+    const updateType = document.getElementById("update-type").value;
+    const submissionType = document.getElementById("update-submission-type").value;
+    const workflow = workflowSelection("update-workflow");
+    if (updateType === "SOP Update" && submissionType !== "New SOP" && !workflow.targetRecordId) {
+      setStatus("update-status", "Select the existing guidance that this request should update.", "error");
       return;
     }
     button.disabled = true;
     try {
-      setStatus("sop-status", "Preparing submission...");
-      const screenshotTokens = await uploadScreenshots(document.getElementById("sop-screenshots"), "sop", "sop-status");
-      await request("/api/submissions", {
+      setStatus("update-status", "Preparing submission...");
+      const screenshotTokens = await uploadScreenshots(document.getElementById("update-screenshots"), "update", "update-status");
+      const result = await request("/api/submissions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          kind: "sop",
+          kind: "update",
+          updateType,
           submissionType,
-          title: document.getElementById("sop-title").value,
-          summary: document.getElementById("sop-summary").value,
-          instruction: document.getElementById("sop-instruction").value,
-          closingGuidance: document.getElementById("sop-closing").value,
-          ticketTagDisplay: document.getElementById("sop-ticket-tags").value,
-          reason: document.getElementById("sop-reason").value,
-          workflowPath: workflowPath("sop-workflow"),
-          suggestedSopId: targetRecordId,
+          title: document.getElementById("update-title").value,
+          summary: document.getElementById("update-summary").value,
+          instruction: document.getElementById("update-instruction").value,
+          closingGuidance: document.getElementById("update-closing").value,
+          ticketTagDisplay: document.getElementById("update-ticket-tags").value,
+          reason: document.getElementById("update-reason").value,
+          publishDate: document.getElementById("update-publish-date").value,
+          url: document.getElementById("update-url").value,
+          workflowPath: workflow.path,
+          workflowCategory: workflow.category,
+          workflowGroup: workflow.group,
+          workflowGroupId: workflow.groupRecordId,
+          suggestedSopId: workflow.targetRecordId,
           screenshotTokens
         })
       });
-      setStatus("sop-status", "SOP update submitted for verification.", "success");
-      form.reset();
-      document.getElementById("sop-instruction").dispatchEvent(new Event("input"));
-      document.getElementById("sop-closing").dispatchEvent(new Event("input"));
+      showSuccess(updateType.toLowerCase(), document.getElementById("update-title").value, result.recordId);
     } catch (error) {
-      setStatus("sop-status", error.message, "error");
+      setStatus("update-status", error.message, "error");
     } finally {
       button.disabled = false;
     }
+  }
+
+  function syncUpdateType() {
+    const updateType = document.getElementById("update-type")?.value || "SOP Update";
+    const sopMode = updateType === "SOP Update";
+    document.querySelectorAll("[data-sop-only]").forEach(element => { element.hidden = !sopMode; });
+    document.querySelectorAll("[data-announcement-only]").forEach(element => { element.hidden = sopMode; });
+    const category = document.getElementById("update-workflow-category");
+    if (category) category.required = sopMode;
+    const date = document.getElementById("update-publish-date");
+    if (!sopMode && date && !date.value) date.value = new Date().toISOString().slice(0, 10);
   }
 
   function activateTab(tab) {
     state.activeTab = tab;
     document.querySelectorAll(".submission-tab").forEach(button => button.classList.toggle("is-active", button.dataset.tab === tab));
     const resource = document.getElementById("submission-resource-panel");
-    const sop = document.getElementById("submission-sop-panel");
+    const update = document.getElementById("submission-update-panel");
     if (resource) resource.hidden = tab !== "resource";
-    if (sop) sop.hidden = tab !== "sop";
+    if (update) update.hidden = tab !== "update";
   }
 
   function bindPage() {
     document.querySelectorAll(".submission-tab").forEach(button => button.addEventListener("click", () => activateTab(button.dataset.tab)));
     bindWorkflowSelector("resource-workflow");
-    bindWorkflowSelector("sop-workflow");
-    ["resource-instruction", "sop-instruction", "sop-closing"].forEach(bindEditor);
+    bindWorkflowSelector("update-workflow");
+    ["resource-instruction", "update-instruction", "update-closing"].forEach(bindEditor);
     bindFileList("resource-screenshots", "resource-screenshot-list");
-    bindFileList("sop-screenshots", "sop-screenshot-list");
+    bindFileList("update-screenshots", "update-screenshot-list");
     document.getElementById("resource-submission-form")?.addEventListener("submit", submitResource);
-    document.getElementById("sop-submission-form")?.addEventListener("submit", submitSopUpdate);
+    document.getElementById("update-submission-form")?.addEventListener("submit", submitUpdate);
+    document.getElementById("update-type")?.addEventListener("change", syncUpdateType);
+    syncUpdateType();
     UI().refreshIcons();
   }
 
@@ -454,20 +509,20 @@
       return;
     }
     if (!hasAnyAccess()) {
-      target.innerHTML = `<section class="submission-access-message"><h1>Submission Access Required</h1><p>Your Feishu account is not currently authorized to submit resources or SOP workflow updates.</p><button type="button" class="primary-action" onclick="showHome()">Return Home</button></section>`;
+      target.innerHTML = `<section class="submission-access-message"><h1>Submission Access Required</h1><p>Your Feishu account is not currently authorized to submit resources or updates.</p><button type="button" class="primary-action" onclick="showHome()">Return Home</button></section>`;
       return;
     }
 
     const resourceAllowed = state.access.canSubmitResources;
-    const sopAllowed = state.access.canSubmitSopUpdates;
-    state.activeTab = resourceAllowed ? "resource" : "sop";
+    const updateAllowed = state.access.canSubmitUpdates || state.access.canSubmitSopUpdates;
+    state.activeTab = resourceAllowed ? "resource" : "update";
     target.innerHTML = `
       <div class="submission-page">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Submission Center</span></nav>
-        <header class="submission-hero"><span class="submission-hero__icon">${UI().icon("file-plus-2")}</span><div><h1>Submission Center</h1><p>Submit formatted resources and proposed SOP workflow changes for review.</p></div></header>
-        ${resourceAllowed && sopAllowed ? `<div class="submission-tabs"><button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button><button type="button" class="submission-tab" data-tab="sop">${UI().icon("workflow")} Submit SOP Update</button></div>` : ""}
+        <header class="submission-hero"><span class="submission-hero__icon">${UI().icon("file-plus-2")}</span><div><h1>Submission Center</h1><p>Submit formatted resources, SOP changes, Important News, and Macro Updates for review.</p></div></header>
+        ${resourceAllowed && updateAllowed ? `<div class="submission-tabs"><button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button><button type="button" class="submission-tab" data-tab="update">${UI().icon("workflow")} Submit Update</button></div>` : ""}
         ${resourceAllowed ? resourceFormHtml() : ""}
-        ${sopAllowed ? sopFormHtml() : ""}
+        ${updateAllowed ? updateFormHtml() : ""}
       </div>
     `;
     bindPage();
