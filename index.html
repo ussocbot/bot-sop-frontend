@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
   <title>BOT SOP</title>
-  <link rel="stylesheet" href="css/styles.css?v=2026.07.16-v9">
+  <link rel="stylesheet" href="css/styles.css?v=2026.07.16-v10">
 </head>
 <body>
   <header class="app-header">
@@ -14,15 +14,17 @@
       <span><strong>BOT SOP</strong><small>Operational Guidance Center</small></span>
     </button>
 
-    <div class="search-shell">
-      <div class="header-search">
+    <div class="search-cluster">
+      <a id="agent-assistant" class="assistant-link header-outline-button" href="#" hidden><i data-lucide="bot"></i><span>Agent Assistant</span></a>
+      <div class="search-shell">
+        <div class="header-search">
         <i data-lucide="search"></i>
         <input type="search" placeholder="Search SOP and Resources" aria-label="Search SOP and Resources">
         <button id="search-filter-toggle" class="search-filter-toggle" type="button" aria-label="Advanced search filters" aria-expanded="false" aria-controls="search-filter-popover">
           <i data-lucide="sliders-horizontal"></i>
           <span id="search-filter-badge" class="search-filter-badge" hidden>0</span>
         </button>
-      </div>
+        </div>
 
       <div id="search-filter-popover" class="search-filter-popover" hidden>
         <header><strong>Advanced Search</strong><button type="button" id="search-filter-close" aria-label="Close filters"><i data-lucide="x"></i></button></header>
@@ -53,11 +55,11 @@
         </div>
       </div>
     </div>
+    </div>
 
     <div class="header-actions">
-      <a id="submit-resource" class="submit-resource-button" href="#" target="_blank" rel="noopener noreferrer" hidden><i data-lucide="circle-plus"></i> Submit Resource</a>
-      <a id="agent-assistant" class="assistant-link" href="#" hidden><i data-lucide="bot"></i> Agent Assistant</a>
-      <span class="build-version" title="Deployment build">Build 2026.07.16-v9</span>
+      <a id="submit-resource" class="submit-resource-button header-outline-button" href="#" hidden><i data-lucide="circle-plus"></i><span>Submission Center</span></a>
+      <span class="build-version" title="Deployment build">Build 2026.07.16-v10</span>
       <span class="signed-in"><i data-lucide="user-round"></i><span id="signed-in-user">Feishu user</span></span>
       <a href="/api/auth/logout">Sign out</a>
     </div>
@@ -72,11 +74,10 @@
   </div>
 
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="js/data.js?v=2026.07.16-v9"></script>
-  <script src="js/components.js?v=2026.07.16-v9"></script>
-  <script src="js/navigation.js?v=2026.07.16-v9"></script>
-  <script src="js/app.js?v=2026.07.16-v9"></script>
+  <script src="js/data.js?v=2026.07.16-v10"></script>
+  <script src="js/components.js?v=2026.07.16-v10"></script>
+  <script src="js/navigation.js?v=2026.07.16-v10"></script>
+  <script src="js/submissions.js?v=2026.07.16-v10"></script>
+  <script src="js/app.js?v=2026.07.16-v10"></script>
 </body>
 </html>
-
-
