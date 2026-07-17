@@ -159,8 +159,8 @@
     if (!rail) return;
     const unique = items => [...new Map(items.map(item => [item.id, item])).values()];
     rail.innerHTML = [
-      UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "green"),
-      UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "orange"),
+      UI.sidebarCard("Important News", "megaphone", unique([...model.featuredFor("Important News"), ...model.section("News", "Important News")]), "red"),
+      UI.sidebarCard("SOP Updates", "file-clock", unique([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]), "yellow"),
       UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
       UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
       UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal", true)
@@ -496,5 +496,3 @@
     });
   };
 })();
-
-
