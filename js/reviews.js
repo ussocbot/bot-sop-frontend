@@ -32,7 +32,7 @@
   function panelHtml() {
     return `
       <section class="submission-panel review-panel" id="submission-review-panel" hidden>
-        <header><h2>Review Updates</h2><p>Review, edit, and approve proposed SOP guidance and announcements.</p></header>
+        <header><h2>Review Submissions</h2><p>Review, edit, and approve proposed SOP guidance and announcements.</p></header>
         <div id="review-center-content" class="review-center-loading">Loading pending reviews...</div>
       </section>
     `;
@@ -77,7 +77,7 @@
           ${items.length ? items.map(item => `
             <button type="button" class="review-queue-item${item.recordId === state.selectedId ? " is-active" : ""}" data-review-id="${escape(item.recordId)}">
               <span class="review-queue-item__top"><strong>${escape(item.title || item.requestName)}</strong><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em></span>
-              <small>${escape(item.updateType)}${item.submissionType ? ` · ${escape(item.submissionType)}` : ""}</small>
+              <small>${escape(item.updateType)}${item.submissionType ? ` | ${escape(item.submissionType)}` : ""}</small>
               <small>${escape(formatDate(item.submittedAt))}</small>
             </button>
           `).join("") : `<div class="review-queue-empty"><strong>No requests here</strong><span>Try another status filter.</span></div>`}
@@ -88,6 +88,34 @@
 
   function modelItem(recordId) {
     return (window.baseModel?.items || []).find(item => item.recordId === recordId) || null;
+  }
+
+  function queueRowsHtml() {
+    const items = visibleRequests();
+    return `
+      <section class="review-queue review-queue--rows">
+        <div class="review-filter-row" role="group" aria-label="Review filters">
+          ${[
+            ["pending", "Pending"],
+            ["approved", "Approved"],
+            ["rejected", "Rejected"],
+            ["all", "All"]
+          ].map(([value, label]) => `<button type="button" data-review-filter="${value}" class="${state.filter === value ? "is-active" : ""}">${label}</button>`).join("")}
+        </div>
+        <div class="review-queue__items">
+          ${items.length ? `<div class="review-queue__header" aria-hidden="true"><span>Submission</span><span>Update Type</span><span>Change Type</span><span>Status</span><span>Submitted</span></div>` : ""}
+          ${items.length ? items.map(item => `
+            <button type="button" class="review-queue-item${item.recordId === state.selectedId ? " is-active" : ""}" data-review-id="${escape(item.recordId)}">
+              <strong class="review-queue-item__title">${escape(item.title || item.requestName)}</strong>
+              <small>${escape(item.updateType)}</small>
+              <small>${escape(item.submissionType || "Not applicable")}</small>
+              <em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em>
+              <small>${escape(formatDate(item.submittedAt))}</small>
+            </button>
+          `).join("") : `<div class="review-queue-empty"><strong>No submissions here</strong><span>Try another status filter.</span></div>`}
+        </div>
+      </section>
+    `;
   }
 
   function appearsIn(item, placement) {
@@ -207,7 +235,7 @@
             </section>
             ${isSop ? `
               <label class="submission-field submission-field--wide"><span>Closing Guidance</span><textarea id="review-closing">${escape(item.closingGuidance)}</textarea></label>
-              <label class="submission-field submission-field--wide"><span>Ticket Tag Display</span><textarea id="review-ticket-tags">${escape(item.ticketTagDisplay)}</textarea></label>
+              <label class="submission-field submission-field--wide"><span>Ticket Tag Display</span><textarea id="review-ticket-tags">${escape(item.ticketTagDisplay || "Tag 1 | Tag 2 | Tag 3")}</textarea></label>
               ${screenshotChoiceHtml(item)}
             ` : ""}
             <label class="submission-field submission-field--wide"><span>Reason for Change</span><textarea id="review-reason">${escape(item.reason)}</textarea></label>
@@ -234,7 +262,7 @@
     }
     const selected = state.requests.find(item => item.recordId === state.selectedId) || null;
     target.className = "review-center";
-    target.innerHTML = `${queueHtml()}<main class="review-detail-shell">${detailHtml(selected)}</main>`;
+    target.innerHTML = `${queueRowsHtml()}<main class="review-detail-shell">${detailHtml(selected)}</main>`;
     bindRenderedPage(selected);
     UI().refreshIcons();
   }
@@ -297,7 +325,7 @@
         const replace = document.querySelector('input[name="review-screenshot-action"][value="Replace Existing"]');
         if (replace) replace.checked = true;
       }
-      if (list) list.innerHTML = files.map(file => `<span>${escape(file.name)} · ${Math.ceil(file.size / 1024)} KB</span>`).join("");
+      if (list) list.innerHTML = files.map(file => `<span>${escape(file.name)} | ${Math.ceil(file.size / 1024)} KB</span>`).join("");
     });
     document.querySelectorAll("[data-review-action]").forEach(button => button.addEventListener("click", () => saveReview(button.dataset.reviewAction)));
   }
@@ -340,7 +368,7 @@
       setStatus("Add reviewer notes before requesting changes or rejecting.", "error");
       return;
     }
-    if (action === "approve" && !window.confirm("Approve this request and send it to the automatic application workflow?")) return;
+    if (action === "approve" && !window.confirm("Approve this submission and send the notification message?")) return;
     const buttons = [...document.querySelectorAll("[data-review-action]")];
     buttons.forEach(button => { button.disabled = true; });
     try {
@@ -375,7 +403,8 @@
           }
         })
       });
-      setStatus(action === "approve" ? "Approved. The automatic application workflow is starting." : "Review saved.", "success");
+      window.BOTSOP_DATA_CACHE?.clear?.();
+      setStatus(action === "approve" ? "Approved. The notification and application workflows can now run." : "Review saved.", "success");
       await loadRequests(true);
     } catch (error) {
       setStatus(error.message, "error");

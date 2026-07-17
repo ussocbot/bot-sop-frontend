@@ -4,6 +4,7 @@ window.appState = {
   currentQuery: "",
   history: [],
   favorites: new Set(),
+  favoritePending: new Set(),
   searchFilters: { source: "all", contentType: "all", requestType: "all", updatedDays: "all" }
 };
 
@@ -100,7 +101,8 @@ window.appState = {
   function favoriteButton(item, compact = false) {
     if (!window.baseMeta?.favoritesEnabled || !item.recordId || item.displayType === "Request Type") return "";
     const active = window.appState.favorites.has(favoriteKey(item));
-    return `<button type="button" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')">${window.BOTSOP_UI.icon("star")} ${active ? "Remove from Favorites" : "Add to Favorites"}</button>`;
+    const pending = window.appState.favoritePending.has(favoriteKey(item));
+    return `<button type="button" data-favorite-id="${window.BOTSOP_UI.escape(item.id)}" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')"${pending ? " disabled" : ""}>${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")} ${pending ? "Saving..." : (active ? "Remove from Favorites" : "Add to Favorites")}</button>`;
   }
 
   function sendToMeButton(item) {
@@ -375,21 +377,67 @@ window.appState = {
     const item = window.baseModel?.find(itemId);
     if (!item?.recordId || !window.baseMeta?.favoritesEnabled) return;
     const key = favoriteKey(item);
+    if (window.appState.favoritePending.has(key)) return;
     const removing = window.appState.favorites.has(key);
-    const response = await fetch("/api/favorites", {
-      method: removing ? "DELETE" : "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ recordId: item.recordId, recordType: item.sourceType === "Documentation" ? "Resource" : "SOP", title: item.title })
-    });
-    if (!response.ok) return window.alert("Unable to update favorites. Please try again.");
     if (removing) window.appState.favorites.delete(key);
     else window.appState.favorites.add(key);
-    if (window.appState.currentView === "section") window.showSection(window.appState.currentSection, false);
-    else if (window.appState.currentView === "home") window.showHome(false);
-    else if (window.appState.currentView === "favorites") window.showFavorites(false);
-    else window.showRecord(item.id, false);
+    window.appState.favoritePending.add(key);
+    writeFavoriteCache();
+    refreshFavoriteButtons(item);
+    try {
+      const response = await fetch("/api/favorites", {
+        method: removing ? "DELETE" : "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ recordId: item.recordId, recordType: item.sourceType === "Documentation" ? "Resource" : "SOP", title: item.title })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Unable to update favorites");
+      if (window.appState.currentView === "favorites" && removing) window.showFavorites(false);
+    } catch (error) {
+      if (removing) window.appState.favorites.add(key);
+      else window.appState.favorites.delete(key);
+      writeFavoriteCache();
+      window.alert(`${error.message}. Please try again.`);
+    } finally {
+      window.appState.favoritePending.delete(key);
+      refreshFavoriteButtons(item);
+    }
   };
+
+  function favoritesCacheKey() {
+    const user = String(window.baseMeta?.signedInAs || "signed-in-user").trim().toLowerCase();
+    return `botsop:favorites:v14:${user}`;
+  }
+
+  function writeFavoriteCache() {
+    try {
+      window.sessionStorage.setItem(favoritesCacheKey(), JSON.stringify([...window.appState.favorites]));
+    } catch {
+      // Storage may be unavailable in restricted browser contexts.
+    }
+  }
+
+  function readFavoriteCache() {
+    try {
+      const values = JSON.parse(window.sessionStorage.getItem(favoritesCacheKey()) || "[]");
+      if (Array.isArray(values)) window.appState.favorites = new Set(values.filter(Boolean));
+    } catch {
+      // Ignore invalid or unavailable cache data.
+    }
+  }
+
+  function refreshFavoriteButtons(item) {
+    const active = window.appState.favorites.has(favoriteKey(item));
+    const pending = window.appState.favoritePending.has(favoriteKey(item));
+    document.querySelectorAll("button[data-favorite-id]").forEach(button => {
+      if (button.dataset.favoriteId !== item.id) return;
+      button.classList.toggle("is-favorite", active);
+      button.disabled = pending;
+      button.innerHTML = `${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")} ${pending ? "Saving..." : (active ? "Remove from Favorites" : "Add to Favorites")}`;
+    });
+    window.BOTSOP_UI.refreshIcons();
+  }
 
   window.sendToMe = async function sendToMe(itemId, button) {
     const item = window.baseModel?.find(itemId);
@@ -436,11 +484,13 @@ window.appState = {
   };
 
   async function loadFavorites() {
+    readFavoriteCache();
     if (!window.baseMeta?.favoritesEnabled) return;
     const response = await fetch("/api/favorites", { credentials: "same-origin", headers: { Accept: "application/json" } });
     if (!response.ok) return;
     const payload = await response.json();
     window.appState.favorites = new Set((payload.favorites || []).map(item => `${String(item.recordType).toLowerCase()}:${item.recordId}`));
+    writeFavoriteCache();
   }
 
   function installCombinedSearch() {
@@ -525,9 +575,9 @@ window.appState = {
 
   async function initializeApp() {
     try {
+      const accessPromise = window.BOTSOP_SUBMISSIONS?.loadAccess?.();
       await window.baseDataReady;
-      await loadFavorites();
-      await window.BOTSOP_SUBMISSIONS?.loadAccess?.();
+      await Promise.all([loadFavorites(), accessPromise]);
       window.buildLeftNavigation();
       window.BOTSOP_UI.renderRightRail(window.baseModel);
       window.BOTSOP_UI.installImageViewer();

@@ -181,7 +181,7 @@
             <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="update-summary" maxlength="2000" required></textarea></label>
             ${editorHtml("update-instruction", "Proposed Instructions / Message", true)}
             <div data-sop-only class="submission-conditional-wide">${editorHtml("update-closing", "Proposed Closing Guidance", false)}</div>
-            <label class="submission-field submission-field--wide" data-sop-only><span>Proposed Ticket Tag Display</span><textarea id="update-ticket-tags" maxlength="3000" placeholder="Tags that should be displayed to the agent"></textarea></label>
+            <label class="submission-field submission-field--wide" data-sop-only><span>Proposed Ticket Tag Display</span><textarea id="update-ticket-tags" maxlength="3000">Tag 1 | Tag 2 | Tag 3</textarea></label>
             <label class="submission-field" data-announcement-only hidden><span>Publish Date</span><input id="update-publish-date" type="date"></label>
             <label class="submission-field" data-announcement-only hidden><span>Resource Link</span><input id="update-url" type="url" placeholder="https://"></label>
             <label class="submission-field submission-field--wide"><span>Reason for Change</span><textarea id="update-reason" maxlength="5000" required></textarea></label>
@@ -557,7 +557,7 @@
     const tabs = [
       resourceAllowed ? `<button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button>` : "",
       updateAllowed ? `<button type="button" class="submission-tab" data-tab="update">${UI().icon("workflow")} Submit Update</button>` : "",
-      reviewAllowed ? `<button type="button" class="submission-tab" data-tab="review">${UI().icon("clipboard-check")} Review Updates</button>` : ""
+      reviewAllowed ? `<button type="button" class="submission-tab" data-tab="review">${UI().icon("clipboard-check")} Review Submissions</button>` : ""
     ].filter(Boolean);
     target.innerHTML = `
       <div class="submission-page">

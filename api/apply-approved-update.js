@@ -143,7 +143,8 @@ function proposedContent(fields) {
     "Content Summary": textValue(findField(fields, ["Proposed Content Summary"])),
     "Instruction": textValue(findField(fields, ["Proposed Instructions"])),
     "Closing Guidance": textValue(findField(fields, ["Proposed Closing Guidance"])),
-    "Ticket Tag Display": textValue(findField(fields, ["Proposed Ticket Tag Display"]))
+    "Ticket Tag Display": textValue(findField(fields, ["Proposed Ticket Tag Display"])),
+    "Update Date": Date.now()
   };
   if (screenshotAction === "Remove Existing") liveFields.Screenshots = [];
   if (screenshotAction === "Replace Existing" && screenshots.length) {

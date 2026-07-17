@@ -39,6 +39,7 @@ window.navigationItems = [];
   const REQUEST_TYPE_ORDER = [
     "Video / Photo Post",
     "Account",
+    "Age Appeals",
     "Live",
     "Comment",
     "Direct Message",
@@ -55,6 +56,8 @@ window.navigationItems = [];
     "video/photo post": "Video / Photo Post",
     "video / photo post": "Video / Photo Post",
     account: "Account",
+    "age appeals": "Age Appeals",
+    "age appeal": "Age Appeals",
     live: "Live",
     comment: "Comment",
     "direct message": "Direct Message",
@@ -253,6 +256,16 @@ window.navigationItems = [];
     return Number.isFinite(parsed) ? parsed : fallback;
   }
 
+  function formattedDateValue(value) {
+    const raw = textValue(value);
+    if (!raw) return "";
+    const timestamp = /^\d{10,13}$/.test(raw)
+      ? (raw.length === 10 ? Number(raw) * 1000 : Number(raw))
+      : Date.parse(raw);
+    if (!Number.isFinite(timestamp)) return raw;
+    return new Date(timestamp).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+
   function slugify(value) {
     return textValue(value)
       .toLowerCase()
@@ -364,7 +377,7 @@ window.navigationItems = [];
       featuredIn: [...new Set(featuredIn)],
       featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
-      lastUpdated: textValue(findField(fields, ["Last Updated"])) || "Not available",
+      lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated"])) || "Not available",
       screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
       screenshots: [...attachmentList(rawScreenshots), ...guidanceAttachments],
       relatedResourceIds: relationIds(rawRelatedResources),
@@ -415,7 +428,7 @@ window.navigationItems = [];
       priority: numberValue(findField(fields, ["Priority"]), 0),
       published: boolValue(findField(fields, ["Published"]), true),
       status: textValue(findField(fields, ["Status"])),
-      lastUpdated: textValue(findField(fields, ["Last Updated", "Updated"])) || "Not available",
+      lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated", "Updated"])) || "Not available",
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
       appearsIn: [],
       parents: [],
@@ -633,22 +646,61 @@ window.navigationItems = [];
     slugify
   };
 
-  window.baseDataReady = fetch("/api/base-records", {
-    credentials: "same-origin",
-    headers: { Accept: "application/json" }
-  }).then(async response => {
-    if (response.status === 401) {
-      window.location.replace("/api/auth/login");
-      return new Promise(() => {});
-    }
+  const DATA_CACHE_KEY = "botsop:base-data:v14";
+  const DATA_CACHE_TTL = 60 * 1000;
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Unable to load Base records");
-    if (!(payload.records || []).length) throw new Error("The configured Base view returned no records");
-
+  function installPayload(payload) {
     window.baseModel = buildModel(payload.records || [], payload.documentationRecords || []);
     window.navigationItems = [...window.baseModel.requestTypes, ...window.baseModel.items];
     window.baseMeta = payload.meta || {};
     return window.baseModel;
-  });
+  }
+
+  function readCache() {
+    try {
+      const cached = JSON.parse(window.sessionStorage.getItem(DATA_CACHE_KEY) || "null");
+      if (!cached?.savedAt || Date.now() - cached.savedAt > DATA_CACHE_TTL || !(cached.payload?.records || []).length) return null;
+      return cached.payload;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeCache(payload) {
+    try {
+      window.sessionStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), payload }));
+    } catch {
+      // Storage may be unavailable in restricted browser contexts.
+    }
+  }
+
+  function clearCache() {
+    try { window.sessionStorage.removeItem(DATA_CACHE_KEY); } catch { /* no-op */ }
+  }
+
+  async function fetchPayload() {
+    const response = await fetch("/api/base-records", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" }
+    });
+    if (response.status === 401) {
+      clearCache();
+      window.location.replace("/api/auth/login");
+      return new Promise(() => {});
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || "Unable to load Base records");
+    if (!(payload.records || []).length) throw new Error("The configured Base view returned no records");
+    writeCache(payload);
+    return payload;
+  }
+
+  window.BOTSOP_DATA_CACHE = { clear: clearCache };
+  const cachedPayload = readCache();
+  if (cachedPayload) {
+    window.baseDataReady = Promise.resolve(installPayload(cachedPayload));
+    fetchPayload().catch(error => console.warn("Background Base refresh failed", error));
+  } else {
+    window.baseDataReady = fetchPayload().then(installPayload);
+  }
 })();
