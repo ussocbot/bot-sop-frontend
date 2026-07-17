@@ -1,3 +1,4 @@
+const { randomUUID } = require("crypto");
 const { fetchJson } = require("../lib/feishu");
 const { getSubmissionAccess } = require("../lib/submission-access");
 
@@ -49,6 +50,10 @@ function dateValue(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function requestStamp(now = new Date()) {
+  return now.toISOString().replace("T", " ").slice(0, 16) + " UTC";
+}
+
 async function createRecord(access, tableId, fields) {
   const url = new URL(
     `/open-apis/bitable/v1/apps/${encodeURIComponent(access.appToken)}` +
@@ -59,6 +64,24 @@ async function createRecord(access, tableId, fields) {
 
   const result = await fetchJson(url, {
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${access.tenantToken}`,
+      "Content-Type": "application/json; charset=utf-8"
+    },
+    body: JSON.stringify({ fields })
+  });
+  return result.data?.record || result.data || {};
+}
+
+async function updateRecord(access, tableId, recordIdValue, fields) {
+  const url = new URL(
+    `/open-apis/bitable/v1/apps/${encodeURIComponent(access.appToken)}` +
+    `/tables/${encodeURIComponent(tableId)}/records/${encodeURIComponent(recordIdValue)}`,
+    access.apiOrigin
+  );
+  url.searchParams.set("user_id_type", "open_id");
+  const result = await fetchJson(url, {
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${access.tenantToken}`,
       "Content-Type": "application/json; charset=utf-8"
@@ -138,7 +161,15 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: "The SOP Update Requests table is not configured." });
       }
 
-      const updateType = kind === "sop" ? "SOP Update" : text(body.updateType, 100);
+      const updateTypeMap = {
+        sop: "SOP Update",
+        important_news: "Important News",
+        macro_update: "Macro Update",
+        "SOP Update": "SOP Update",
+        "Important News": "Important News",
+        "Macro Update": "Macro Update"
+      };
+      const updateType = kind === "sop" ? "SOP Update" : updateTypeMap[text(body.updateType, 100)];
       const allowedUpdateTypes = new Set(["SOP Update", "Important News", "Macro Update"]);
       if (!allowedUpdateTypes.has(updateType)) {
         return res.status(400).json({ error: "Select a valid update type." });
@@ -162,8 +193,11 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: "Resource Link must be a valid web address." });
       }
 
+      const submissionId = randomUUID();
+      const requestName = `${updateType}: ${title} - ${requestStamp()} - ${submissionId.slice(0, 8)}`.slice(0, 500);
       const fields = {
-        "Request Name": `${updateType}: ${title}`.slice(0, 500),
+        "Request Name": requestName,
+        "Submission ID": submissionId,
         "Update Type": updateType,
         "Workflow Path": text(body.workflowPath, 2000),
         "Proposed Request Type": text(body.workflowCategory, 500),
@@ -189,7 +223,16 @@ module.exports = async function handler(req, res) {
       if (screenshots.length) fields.Screenshots = attachmentFields(screenshots);
 
       const record = await createRecord(access, tableId, fields);
-      return res.status(201).json({ ok: true, recordId: record.record_id || record.id || "" });
+      const createdRecordId = record.record_id || record.id || "";
+      if (!RECORD_ID.test(createdRecordId)) throw new Error("Feishu did not return the new request record ID");
+      await updateRecord(access, tableId, createdRecordId, { "Request Record ID": createdRecordId });
+      return res.status(201).json({
+        ok: true,
+        recordId: createdRecordId,
+        submissionId,
+        updateType,
+        requestName
+      });
     }
 
     return res.status(400).json({ error: "Unknown submission type." });
