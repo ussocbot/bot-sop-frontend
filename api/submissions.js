@@ -129,7 +129,7 @@ module.exports = async function handler(req, res) {
       const fields = {
         "Content Name": title,
         "Content Summary": text(body.summary, 5000),
-        "Instruction": text(body.instruction),
+        "Guidance": text(body.instruction),
         "Status": "Pending Review",
         "Published": false,
         "Submitted By": submitter(access.session.openId),
@@ -149,6 +149,47 @@ module.exports = async function handler(req, res) {
 
       const record = await createRecord(access, tableId, fields);
       return res.status(201).json({ ok: true, recordId: record.record_id || record.id || "" });
+    }
+
+    if (kind === "relation_suggestion") {
+      if (!access.canSubmitResources) {
+        return res.status(403).json({ error: "You do not have permission to suggest related items." });
+      }
+      const tableId = process.env.FEISHU_SOP_UPDATE_REQUESTS_TABLE_ID;
+      if (!tableId) return res.status(500).json({ error: "The SOP Update Requests table is not configured." });
+      const targetSopId = recordId(body.targetSopId);
+      const relationKind = text(body.relationKind, 30).toLowerCase();
+      if (!targetSopId) return res.status(400).json({ error: "A valid target SOP is required." });
+      if (!["link", "resource", "task"].includes(relationKind)) return res.status(400).json({ error: "Select a valid suggestion type." });
+      const resourceId = recordId(body.resourceId);
+      const taskId = recordId(body.taskId);
+      const proposedUrl = safeUrl(body.url);
+      if (relationKind === "link" && !proposedUrl) return res.status(400).json({ error: "Enter a valid link URL." });
+      if (relationKind === "resource" && !resourceId) return res.status(400).json({ error: "Select an existing Resource Hub entry." });
+      if (relationKind === "task" && !taskId) return res.status(400).json({ error: "Select an existing SOP task." });
+      const title = text(body.title, 500) || text(body.targetTitle, 500) || "Related item suggestion";
+      const submissionId = randomUUID();
+      const fields = {
+        "Request Name": `Related Item: ${title} - ${requestStamp()} - ${submissionId.slice(0, 8)}`.slice(0, 500),
+        "Submission ID": submissionId,
+        "Update Type": "Related Item Suggestion",
+        "Proposed Content Name": title,
+        "Relation Suggestion Type": relationKind === "link" ? "New Link" : relationKind === "resource" ? "Existing Resource" : "Existing Task",
+        "Suggested Existing SOP": [targetSopId],
+        "Reason for Change": text(body.reason, 10000),
+        "Submitted By": submitter(access.session.openId),
+        "Submitted At": Date.now(),
+        "Review Status": "Pending Review",
+        "Apply Status": "Pending"
+      };
+      if (proposedUrl) fields["Proposed URL"] = { link: proposedUrl, text: title };
+      if (resourceId) fields["Suggested Related Resource"] = [resourceId];
+      if (taskId) fields["Suggested Linked Task"] = [taskId];
+      const record = await createRecord(access, tableId, fields);
+      const createdRecordId = record.record_id || record.id || "";
+      if (!RECORD_ID.test(createdRecordId)) throw new Error("Feishu did not return the new request record ID");
+      await updateRecord(access, tableId, createdRecordId, { "Request Record ID": createdRecordId });
+      return res.status(201).json({ ok: true, recordId: createdRecordId, submissionId, title });
     }
 
     if (kind === "update" || kind === "sop") {
@@ -203,7 +244,7 @@ module.exports = async function handler(req, res) {
         "Proposed Request Type": text(body.workflowCategory, 500),
         "Proposed Content Name": title,
         "Proposed Content Summary": text(body.summary, 5000),
-        "Proposed Instructions": text(body.instruction),
+        "Proposed Guidance": text(body.instruction),
         "Proposed Closing Guidance": text(body.closingGuidance),
         "Proposed Ticket Tag Display": text(body.ticketTagDisplay, 10000),
         "Reason for Change": text(body.reason, 10000),

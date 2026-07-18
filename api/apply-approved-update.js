@@ -27,6 +27,11 @@ function textValue(value, seen = new Set()) {
   return textValue(value.text ?? value.name ?? value.title ?? value.label ?? value.value ?? value.link ?? value.id ?? "", seen);
 }
 
+function boolValue(value) {
+  if (typeof value === "boolean") return value;
+  return ["true", "yes", "1", "checked"].includes(normalize(textValue(value)));
+}
+
 function linkedIds(value, found = new Set(), seen = new Set()) {
   if (!value || seen.has(value)) return [...found];
   if (typeof value === "string") {
@@ -141,7 +146,7 @@ function proposedContent(fields) {
   const liveFields = {
     "Content Name": title,
     "Content Summary": textValue(findField(fields, ["Proposed Content Summary"])),
-    "Instruction": textValue(findField(fields, ["Proposed Instructions"])),
+    "Guidance": textValue(findField(fields, ["Proposed Guidance", "Proposed Instructions"])),
     "Closing Guidance": textValue(findField(fields, ["Proposed Closing Guidance"])),
     "Ticket Tag Display": textValue(findField(fields, ["Proposed Ticket Tag Display"])),
     "Update Date": Date.now()
@@ -200,6 +205,7 @@ module.exports = async function handler(req, res) {
 
     const updateType = textValue(findField(fields, ["Update Type"])) || "SOP Update";
     const submissionType = textValue(findField(fields, ["Submission Type"]));
+    const sendNotification = boolValue(findField(fields, ["Send Notification"]));
     const { title, liveFields } = proposedContent(fields);
     if (!title) throw new Error("Proposed Content Name is blank");
 
@@ -220,11 +226,49 @@ module.exports = async function handler(req, res) {
           "Published": true
         });
         if (parentId) liveFields.Parent = [parentId];
+        if (sendNotification) liveFields["Featured In"] = ["SOP Updates"];
         liveRecord = await writeRecord(config, liveTableId, liveFields);
       } else {
         if (!targetId) throw new Error("No verified or suggested SOP target was selected");
+        if (sendNotification) {
+          const currentTarget = await getRecord(config, liveTableId, targetId);
+          const featured = textValue(findField(currentTarget?.fields || {}, ["Featured In"])).split(",").map(value => value.trim()).filter(Boolean);
+          liveFields["Featured In"] = [...new Set([...featured, "SOP Updates"])];
+        }
         liveRecord = await writeRecord(config, liveTableId, liveFields, targetId);
       }
+    } else if (updateType === "Related Item Suggestion") {
+      const targetId = linkedIds(findField(fields, ["Verified Replacement Target"]))[0] || linkedIds(findField(fields, ["Suggested Existing SOP"]))[0] || "";
+      if (!targetId) throw new Error("No target SOP was selected for this suggestion");
+      const relationType = textValue(findField(fields, ["Relation Suggestion Type"]));
+      const currentTarget = await getRecord(config, liveTableId, targetId);
+      const currentFields = currentTarget?.fields || {};
+      if (relationType === "Existing Resource") {
+        const resourceId = linkedIds(findField(fields, ["Suggested Related Resource"]))[0] || "";
+        if (!resourceId) throw new Error("No Resource Hub entry was selected");
+        const existing = linkedIds(findField(currentFields, ["Related Resources"]));
+        await writeRecord(config, liveTableId, { "Related Resources": [...new Set([...existing, resourceId])] }, targetId);
+      } else if (relationType === "Existing Task") {
+        const taskId = linkedIds(findField(fields, ["Suggested Linked Task"]))[0] || "";
+        if (!taskId) throw new Error("No linked SOP task was selected");
+        const existing = linkedIds(findField(currentFields, ["Linked Tasks"]));
+        await writeRecord(config, liveTableId, { "Linked Tasks": [...new Set([...existing, taskId])] }, targetId);
+      } else if (relationType === "New Link") {
+        const documentationTableId = process.env.FEISHU_DOCUMENTATION_TABLE_ID || "tbljdoFsgOuHMGSO";
+        const proposedUrl = deepUrl(findField(fields, ["Proposed URL"]));
+        if (!proposedUrl) throw new Error("The suggested link URL is blank or invalid");
+        await writeRecord(config, documentationTableId, {
+          "Content Name": title,
+          "Content Summary": textValue(findField(fields, ["Reason for Change"])),
+          "URL": { link: proposedUrl, text: title },
+          "SOP": [targetId],
+          "Status": "Active",
+          "Published": true
+        });
+      } else {
+        throw new Error(`Unsupported relation suggestion type: ${relationType || "blank"}`);
+      }
+      liveRecord = { record_id: targetId };
     } else if (["Important News", "Macro Update"].includes(updateType)) {
       const proposedUrl = deepUrl(findField(fields, ["Proposed URL"]));
       const isNews = updateType === "Important News";

@@ -166,11 +166,49 @@
       <article class="review-current-card">
         <h4>${escape(item.title)}</h4>
         ${item.summary ? `<p><strong>Summary</strong>${escape(item.summary)}</p>` : ""}
-        ${item.instruction ? `<div><strong>Instructions</strong>${UI().markdown(item.instruction)}</div>` : ""}
+        ${item.instruction ? `<div><strong>Guidance</strong>${UI().markdown(item.instruction)}</div>` : ""}
         ${item.closingGuidance ? `<div><strong>Closing Guidance</strong>${UI().markdown(item.closingGuidance)}</div>` : ""}
         ${item.ticketTagDisplay ? `<p><strong>Ticket Tags</strong>${escape(item.ticketTagDisplay)}</p>` : ""}
         ${(item.screenshots || []).length ? `<p><strong>Screenshots</strong>${item.screenshots.length} existing image${item.screenshots.length === 1 ? "" : "s"}</p>` : ""}
       </article>
+    `;
+  }
+
+  function proposedGuidanceHtml(values) {
+    return `
+      <article class="review-current-card review-proposed-card">
+        <h4>${escape(values.title || "Untitled guidance")}</h4>
+        ${values.summary ? `<p><strong>Summary</strong>${escape(values.summary)}</p>` : ""}
+        ${values.instruction ? `<div><strong>Guidance</strong>${UI().markdown(values.instruction)}</div>` : ""}
+        ${values.closingGuidance ? `<div><strong>Closing Guidance</strong>${UI().markdown(values.closingGuidance)}</div>` : ""}
+        ${values.ticketTagDisplay ? `<p><strong>Ticket Tags</strong>${escape(values.ticketTagDisplay)}</p>` : ""}
+        ${!values.summary && !values.instruction && !values.closingGuidance && !values.ticketTagDisplay ? `<p>No proposed guidance has been entered.</p>` : ""}
+      </article>
+    `;
+  }
+
+  function relationDetailHtml(item, current) {
+    const resources = (window.baseModel?.documents || []).filter(entry => entry.recordId).sort((a, b) => a.title.localeCompare(b.title));
+    const tasks = (window.baseModel?.items || []).filter(entry => entry.recordId && !["Request Type", "Tool", "Link"].includes(entry.displayType)).sort((a, b) => a.title.localeCompare(b.title));
+    const type = item.relationSuggestionType || "New Link";
+    return `
+      <section class="review-detail" data-review-record="${escape(item.recordId)}">
+        <header class="review-detail__header"><div><span class="review-type-pill">Related Item Suggestion</span><h3>${escape(item.requestName || item.title)}</h3><p>Submitted ${escape(formatDate(item.submittedAt))}${item.submittedBy ? ` by ${escape(item.submittedBy)}` : ""}</p></div><div><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em><small>Apply: ${escape(item.applyStatus)}</small></div></header>
+        <form id="review-edit-form" class="submission-form">
+          <input type="hidden" id="review-update-type" value="Related Item Suggestion">
+          <div class="submission-grid">
+            <section class="review-comparison"><div><h3>Target SOP</h3>${currentGuidanceHtml(current)}</div><div><h3>Proposed Relationship</h3><article class="review-current-card review-proposed-card"><h4>${escape(item.title)}</h4><p><strong>Type</strong>${escape(type)}</p>${item.url ? `<p><strong>Link</strong>${escape(item.url)}</p>` : ""}<p>${escape(item.reason)}</p></article></div></section>
+            <label class="submission-field"><span>Suggestion Type</span><select id="review-relation-type">${["New Link", "Existing Resource", "Existing Task"].map(value => `<option value="${value}"${type === value ? " selected" : ""}>${value}</option>`).join("")}</select></label>
+            <label class="submission-field submission-field--wide"><span>Display Name</span><input id="review-title" value="${escape(item.title)}" required></label>
+            <label class="submission-field submission-field--wide"><span>URL</span><input id="review-url" type="url" value="${escape(item.url)}" placeholder="https://"></label>
+            <label class="submission-field submission-field--wide"><span>Existing Resource</span><select id="review-related-resource">${options(resources, "Select a resource", item.suggestedResourceId, entry => entry.recordId, entry => entry.title)}</select></label>
+            <label class="submission-field submission-field--wide"><span>Existing SOP Task</span><select id="review-related-task">${options(tasks, "Select an SOP task", item.suggestedTaskId, entry => entry.recordId, entry => entry.title)}</select></label>
+            <label class="submission-field submission-field--wide"><span>Reason for Suggestion</span><textarea id="review-reason">${escape(item.reason)}</textarea></label>
+            <label class="submission-field submission-field--wide"><span>Reviewer Notes</span><textarea id="review-notes" placeholder="Required when requesting changes or rejecting">${escape(item.reviewNotes)}</textarea></label>
+          </div>
+          <div class="review-action-bar"><span id="review-action-status" class="submission-status"></span><button type="button" class="secondary-action" data-review-action="save">Save Changes</button><button type="button" class="review-needs-action" data-review-action="needs_changes">Needs Changes</button><button type="button" class="review-reject-action" data-review-action="reject">Reject</button><button type="button" class="submission-submit review-approve-action" data-review-action="approve">${UI().icon("badge-check")} Approve</button></div>
+        </form>
+      </section>
     `;
   }
 
@@ -201,6 +239,7 @@
     const parentId = item.proposedParentId || current?.parentIds?.[0] || "";
     const groups = category ? groupChoices(category) : [];
     const targets = category && (!groups.length || parentId) ? targetChoices(category, parentId) : [];
+    if (item.updateType === "Related Item Suggestion") return relationDetailHtml(item, current);
     return `
       <section class="review-detail" data-review-record="${escape(item.recordId)}">
         <header class="review-detail__header">
@@ -231,7 +270,7 @@
             <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="review-summary">${escape(item.summary)}</textarea></label>
             <section class="review-comparison">
               <div><h3>Current Guidance</h3><div id="review-current-guidance">${currentGuidanceHtml(current)}</div></div>
-              <div><h3>Proposed Guidance</h3><label class="submission-field"><span>Instructions / Message</span><textarea id="review-instruction" class="review-large-text">${escape(item.instruction)}</textarea></label></div>
+              <div><h3>Proposed Guidance</h3><label class="submission-field"><span>Guidance / Message</span><textarea id="review-instruction" class="review-large-text">${escape(item.instruction)}</textarea></label><div id="review-proposed-guidance">${proposedGuidanceHtml(item)}</div></div>
             </section>
             ${isSop ? `
               <label class="submission-field submission-field--wide"><span>Closing Guidance</span><textarea id="review-closing">${escape(item.closingGuidance)}</textarea></label>
@@ -243,6 +282,7 @@
           </div>
           <div class="review-action-bar">
             <span id="review-action-status" class="submission-status"></span>
+            <label class="review-notification-toggle"><input id="review-send-notification" type="checkbox"${item.sendNotification ? " checked" : ""}> Send notification message after approval</label>
             <button type="button" class="secondary-action" data-review-action="save">Save Changes</button>
             <button type="button" class="review-needs-action" data-review-action="needs_changes">Needs Changes</button>
             <button type="button" class="review-reject-action" data-review-action="reject">Reject</button>
@@ -317,6 +357,20 @@
     }));
     if (!selected) return;
     bindReviewWorkflow(selected);
+    const proposedPreview = document.getElementById("review-proposed-guidance");
+    const refreshProposedPreview = () => {
+      if (!proposedPreview) return;
+      proposedPreview.innerHTML = proposedGuidanceHtml({
+        title: document.getElementById("review-title")?.value || "",
+        summary: document.getElementById("review-summary")?.value || "",
+        instruction: document.getElementById("review-instruction")?.value || "",
+        closingGuidance: document.getElementById("review-closing")?.value || "",
+        ticketTagDisplay: document.getElementById("review-ticket-tags")?.value || ""
+      });
+    };
+    ["review-title", "review-summary", "review-instruction", "review-closing", "review-ticket-tags"].forEach(id => {
+      document.getElementById(id)?.addEventListener("input", refreshProposedPreview);
+    });
     const input = document.getElementById("review-screenshots");
     const list = document.getElementById("review-screenshot-list");
     input?.addEventListener("change", () => {
@@ -368,7 +422,10 @@
       setStatus("Add reviewer notes before requesting changes or rejecting.", "error");
       return;
     }
-    if (action === "approve" && !window.confirm("Approve this submission and send the notification message?")) return;
+    const sendNotification = Boolean(document.getElementById("review-send-notification")?.checked);
+    if (action === "approve" && !window.confirm(sendNotification
+      ? "Approve this submission and send the notification message?"
+      : "Approve this submission without sending a notification message?")) return;
     const buttons = [...document.querySelectorAll("[data-review-action]")];
     buttons.forEach(button => { button.disabled = true; });
     try {
@@ -398,13 +455,17 @@
             reviewNotes: notes,
             publishDate: document.getElementById("review-publish-date")?.value || item.publishDate,
             url: document.getElementById("review-url")?.value || item.url,
+            relationSuggestionType: document.getElementById("review-relation-type")?.value || item.relationSuggestionType,
+            suggestedResourceId: document.getElementById("review-related-resource")?.value || item.suggestedResourceId,
+            suggestedTaskId: document.getElementById("review-related-task")?.value || item.suggestedTaskId,
+            sendNotification,
             screenshotAction,
             screenshotTokens
           }
         })
       });
       window.BOTSOP_DATA_CACHE?.clear?.();
-      setStatus(action === "approve" ? "Approved. The notification and application workflows can now run." : "Review saved.", "success");
+      setStatus(action === "approve" ? (sendNotification ? "Approved. The update can apply and the notification workflow can run." : "Approved without a notification message.") : "Review saved.", "success");
       await loadRequests(true);
     } catch (error) {
       setStatus(error.message, "error");

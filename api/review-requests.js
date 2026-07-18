@@ -105,11 +105,15 @@ function mapRequest(record) {
     verifiedTargetId: linkedIds(findField(fields, ["Verified Replacement Target"]))[0] || "",
     title: textValue(findField(fields, ["Proposed Content Name"])),
     summary: textValue(findField(fields, ["Proposed Content Summary"])),
-    instruction: textValue(findField(fields, ["Proposed Instructions"])),
+    instruction: textValue(findField(fields, ["Proposed Guidance", "Proposed Instructions"])),
     closingGuidance: textValue(findField(fields, ["Proposed Closing Guidance"])),
     ticketTagDisplay: textValue(findField(fields, ["Proposed Ticket Tag Display"])),
     reason: textValue(findField(fields, ["Reason for Change"])),
     url: deepUrl(findField(fields, ["Proposed URL"])),
+    relationSuggestionType: textValue(findField(fields, ["Relation Suggestion Type"])),
+    suggestedResourceId: linkedIds(findField(fields, ["Suggested Related Resource"]))[0] || "",
+    suggestedTaskId: linkedIds(findField(fields, ["Suggested Linked Task"]))[0] || "",
+    sendNotification: ["true", "yes", "1"].includes(String(findField(fields, ["Send Notification"]) ?? "").trim().toLowerCase()) || findField(fields, ["Send Notification"]) === true,
     publishDate: dateInputValue(findField(fields, ["Proposed Publish Date"])),
     screenshots: attachmentList(findField(fields, ["Screenshots"])),
     screenshotAction: textValue(findField(fields, ["Screenshot Action"])) || "Keep Existing",
@@ -169,12 +173,13 @@ function reviewFields(body, openId) {
   const fields = {
     "Proposed Content Name": title,
     "Proposed Content Summary": limitedText(values.summary, 5000),
-    "Proposed Instructions": limitedText(values.instruction),
+    "Proposed Guidance": limitedText(values.instruction),
     "Proposed Closing Guidance": limitedText(values.closingGuidance),
     "Proposed Ticket Tag Display": limitedText(values.ticketTagDisplay, 10000),
     "Reason for Change": limitedText(values.reason, 10000),
     "Review Notes": limitedText(values.reviewNotes, 10000),
-    "Screenshot Action": screenshotAction
+    "Screenshot Action": screenshotAction,
+    "Send Notification": Boolean(values.sendNotification)
   };
 
   if (updateType === "SOP Update") {
@@ -189,6 +194,15 @@ function reviewFields(body, openId) {
     fields["Proposed URL"] = proposedUrl ? { link: proposedUrl, text: title } : null;
     const publishDate = limitedText(values.publishDate, 100);
     fields["Proposed Publish Date"] = publishDate ? Date.parse(`${publishDate}T12:00:00Z`) : null;
+  }
+
+  if (updateType === "Related Item Suggestion") {
+    const relationType = limitedText(values.relationSuggestionType, 100);
+    const resourceId = limitedText(values.suggestedResourceId, 100);
+    const taskId = limitedText(values.suggestedTaskId, 100);
+    fields["Relation Suggestion Type"] = relationType;
+    fields["Suggested Related Resource"] = RECORD_ID.test(resourceId) ? [resourceId] : [];
+    fields["Suggested Linked Task"] = RECORD_ID.test(taskId) ? [taskId] : [];
   }
 
   const screenshotTokens = Array.isArray(values.screenshotTokens)

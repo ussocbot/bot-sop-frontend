@@ -48,6 +48,7 @@
       });
       line = UI.escape(line)
         .replace(/\*\*\*([^*\n]+)\*\*\*/g, "<strong><em>$1</em></strong>")
+        .replace(/__([^_\n]+)__/g, "<u>$1</u>")
         .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
         .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
         .replace(/_([^_\n]+)_/g, "<em>$1</em>");
@@ -56,9 +57,11 @@
 
     const html = [];
     let listType = "";
+    let listDepth = 0;
     function closeList() {
       if (listType) html.push(`</${listType}>`);
       listType = "";
+      listDepth = 0;
     }
 
     source.split("\n").forEach(line => {
@@ -73,16 +76,29 @@
         html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
         return;
       }
-      const unordered = line.match(/^\s*[-*]\s+(.+)$/);
+      if (/^\s*___+\s*$/.test(line)) {
+        closeList();
+        html.push('<hr class="content-divider">');
+        return;
+      }
+      const strongHeading = line.match(/^\s*\*\*([^*\n]+)\*\*\s*$/);
+      if (strongHeading) {
+        closeList();
+        html.push(`<h3 class="formatted-content__strong-heading">${inline(strongHeading[1])}</h3>`);
+        return;
+      }
+      const nestedBullet = line.match(/^\s*(-{1,3}|\*)\s+(.+)$/);
       const ordered = line.match(/^\s*\d+[.)]\s+(.+)$/);
-      if (unordered || ordered) {
-        const desired = unordered ? "ul" : "ol";
-        if (listType !== desired) {
+      if (nestedBullet || ordered) {
+        const desired = nestedBullet ? "ul" : "ol";
+        const depth = nestedBullet && nestedBullet[1] !== "*" ? nestedBullet[1].length : 1;
+        if (listType !== desired || listDepth !== depth) {
           closeList();
           listType = desired;
-          html.push(`<${desired}>`);
+          listDepth = depth;
+          html.push(`<${desired} class="formatted-list formatted-list--depth-${depth}">`);
         }
-        html.push(`<li>${inline((unordered || ordered)[1])}</li>`);
+        html.push(`<li>${inline(nestedBullet ? nestedBullet[2] : ordered[1])}</li>`);
         return;
       }
       closeList();
@@ -103,7 +119,7 @@
   };
 
   UI.actionAttributes = function actionAttributes(item) {
-    if ((item.isFeatured || ["News", "SOP Update"].includes(item.displayType)) && item.id) {
+    if ((item.isFeatured || ["News", "SOP Update", "Macro Update"].includes(item.displayType)) && item.id) {
       return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
     }
     if (item.url) {
@@ -117,8 +133,8 @@
 
   UI.itemBadge = function itemBadge(item) {
     if (item.badge) return item.badge;
-    if (!item.publishDate) return "";
-    const raw = String(item.publishDate).trim();
+    if (!item.updateDateRaw && !item.publishDate) return "";
+    const raw = String(item.updateDateRaw || item.publishDate).trim();
     const published = /^\d{10,13}$/.test(raw)
       ? new Date(raw.length === 10 ? Number(raw) * 1000 : Number(raw))
       : new Date(raw);
@@ -166,7 +182,7 @@
         const parsed = Date.parse(raw);
         return Number.isFinite(parsed) ? parsed : 0;
       };
-      return parse(b.publishDate || b.lastUpdated) - parse(a.publishDate || a.lastUpdated) || (b.priority || 0) - (a.priority || 0) || a.title.localeCompare(b.title);
+      return parse(b.updateDateRaw || b.publishDate || b.lastUpdated) - parse(a.updateDateRaw || a.publishDate || a.lastUpdated) || (b.priority || 0) - (a.priority || 0) || a.title.localeCompare(b.title);
     });
     const importantNews = newestFirst([...model.featuredFor("Important News"), ...model.section("News", "Important News")]);
     const sopUpdates = newestFirst([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]);
@@ -203,15 +219,17 @@
           ${UI.icon("chevron-down", "home-strip__chevron")}
         </summary>
         <div class="home-strip__content">
-          ${items.length ? items.map(item => `
+          ${items.length ? items.map(item => {
+            const badge = UI.itemBadge(item);
+            return `
             <details class="expectation-item" data-accordion-group="home-entry-${UI.escape(group)}">
               <summary>
-                <span class="expectation-item__title"><span class="expectation-item__icon">${UI.icon(item.icon || "file-text")}</span><strong>${UI.escape(item.title)}</strong></span>
+                <span class="expectation-item__title"><span class="expectation-item__icon">${UI.icon(item.icon || "file-text")}</span><strong>${UI.escape(item.title)}${badge ? `<span class="entry-new-badge">${UI.escape(badge)}</span>` : ""}</strong></span>
                 ${UI.icon("chevron-down")}
               </summary>
               <div class="expectation-item__body">${UI.inlineContent(item)}</div>
             </details>
-          `).join("") : `<p class="home-strip__empty">Nothing is mapped here yet.</p>`}
+          `; }).join("") : `<p class="home-strip__empty">Nothing is mapped here yet.</p>`}
         </div>
       </details>
     `;
@@ -254,7 +272,7 @@
           ${requestTypes.map(item => `
             <button type="button" class="request-card" onclick="showSection('${UI.escape(item.id)}')">
               <span class="request-card__icon">${UI.icon(item.icon || "folder")}</span>
-              <span><strong>${UI.escape(item.title)}</strong><small>${UI.escape(item.description || "Open guidance")}</small></span>
+              <span><strong>${item.specialType ? `${UI.icon("star", "special-request-icon")} ` : ""}${UI.escape(item.title)}</strong><small>${UI.escape(item.description || "Open guidance")}</small></span>
               ${UI.icon("chevron-right")}
             </button>
           `).join("")}
@@ -285,10 +303,11 @@
 
   UI.processCard = function processCard(item) {
     const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
+    const badge = UI.itemBadge(item);
     return `
       <button type="button" class="process-card" onclick="showRecord('${UI.escape(item.id)}')">
         <span class="process-card__icon">${UI.icon(item.icon || "file-text")}</span>
-        <span><em class="content-kind">${kind}</em><strong>${UI.escape(item.title)}</strong><small>${UI.escape(item.description || "Open guidance")}</small></span>
+        <span><em class="content-kind">${kind}</em><strong>${UI.escape(item.title)}${badge ? `<span class="entry-new-badge">${UI.escape(badge)}</span>` : ""}</strong><small>${UI.escape(item.description || "Open guidance")}</small></span>
         ${UI.icon("chevron-right")}
       </button>
     `;
@@ -296,13 +315,14 @@
 
   UI.processAccordion = function processAccordion(item, favoriteHtml = "") {
     const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
+    const badge = UI.itemBadge(item);
     return `
       <details class="process-accordion" data-accordion-group="process-guidance">
         <summary>
           <span class="process-card__icon">${UI.icon(item.icon || "file-text")}</span>
           <span class="process-accordion__preview">
             <em class="content-kind">${kind}</em>
-            <strong>${UI.escape(item.title)}</strong>
+            <strong>${UI.escape(item.title)}${badge ? `<span class="entry-new-badge">${UI.escape(badge)}</span>` : ""}</strong>
             <small>${UI.escape(item.description || "Open guidance")}</small>
           </span>
           ${UI.icon("chevron-down", "process-accordion__chevron")}
@@ -368,30 +388,47 @@
     `;
   };
 
-  UI.relatedItemsSection = function relatedItemsSection(resources, tasks) {
-    const relatedResources = (resources || []).filter(item => item?.url);
-    const linkedTasks = (tasks || []).filter(item => item?.id && !item.unresolved);
-    if (!relatedResources.length && !linkedTasks.length) return "";
+  UI.relatedItemsSection = function relatedItemsSection(itemOrResources, legacyTasks) {
+    const item = Array.isArray(itemOrResources)
+      ? { relatedResources: itemOrResources, linkedTasks: legacyTasks || [] }
+      : (itemOrResources || {});
+    const directLinks = item.url ? [{
+      title: item.ctaLabel || "Open Resource",
+      url: item.url,
+      icon: "external-link",
+      kind: "Content link",
+      publishDate: item.publishDate
+    }] : [];
+    const sorter = (a, b) => (a.sortOrder || 9999) - (b.sortOrder || 9999) || String(a.title || "").localeCompare(String(b.title || ""));
+    const relatedResources = (item.relatedResources || []).filter(entry => entry?.url).sort(sorter);
+    const linkedTasks = (item.linkedTasks || []).filter(entry => entry?.id && !entry.unresolved).sort(sorter);
+    if (!directLinks.length && !relatedResources.length && !linkedTasks.length && !item.recordId) return "";
+    const resourceRows = [...directLinks, ...relatedResources];
     return `
       <section class="detail-section detail-section--related">
         <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
+        ${item.recordId ? `<button type="button" class="suggest-related-button" onclick="openRelatedSuggestion('${UI.escape(item.id)}')">${UI.icon("message-square-plus")} Suggest a Related Resource or Task</button>` : ""}
         <div class="detail-link-list">
-          ${relatedResources.map(item => `
+          ${resourceRows.map(entry => {
+            const badge = UI.itemBadge(entry);
+            return `
             <div class="detail-link-row">
-              <a class="detail-link-main" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
-                <span>${UI.icon(item.icon || "book-open")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">Resource</small></span>${UI.icon("arrow-up-right")}
+              <a class="detail-link-main" href="${UI.escape(entry.url)}" target="_blank" rel="noopener noreferrer">
+                <span>${UI.icon(entry.icon || "book-open")}<strong>${UI.escape(entry.title)}${badge ? `<em class="entry-new-badge">${UI.escape(badge)}</em>` : ""}</strong><small class="link-kind">${UI.escape(entry.kind || "Resource")}</small></span>${UI.icon("arrow-up-right")}
               </a>
-              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(item.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(item.title)}" title="Copy link">${UI.icon("copy")}</button>
+              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(entry.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(entry.title)}" title="Copy link">${UI.icon("copy")}</button>
             </div>
-          `).join("")}
-          ${linkedTasks.map(item => `
+          `; }).join("")}
+          ${linkedTasks.map(entry => {
+            const badge = UI.itemBadge(entry);
+            return `
             <div class="detail-link-row">
-              <button type="button" class="detail-link-main" onclick="showRecord('${UI.escape(item.id)}')">
-                <span>${UI.icon(item.icon || "file-text")}<strong>${UI.escape(item.title)}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
+              <button type="button" class="detail-link-main" onclick="showRecord('${UI.escape(entry.id)}')">
+                <span>${UI.icon(entry.icon || "file-text")}<strong>${UI.escape(entry.title)}${badge ? `<em class="entry-new-badge">${UI.escape(badge)}</em>` : ""}</strong><small class="link-kind">SOP entry</small></span>${UI.icon("chevron-right")}
               </button>
-              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(`${window.location.origin}${window.location.pathname}?record=${encodeURIComponent(item.id)}`)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(item.title)}" title="Copy link">${UI.icon("copy")}</button>
+              <button type="button" class="copy-link-button" data-copy-url="${UI.escape(`${window.location.origin}${window.location.pathname}?record=${encodeURIComponent(entry.id)}`)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(entry.title)}" title="Copy link">${UI.icon("copy")}</button>
             </div>
-          `).join("")}
+          `; }).join("")}
         </div>
       </section>
     `;
@@ -429,13 +466,12 @@
     return `
       <div class="inline-content">
         ${actionHtml}
-        ${UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
+        ${UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
         ${UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
         ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
-        ${UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${item.url ? `<a class="primary-action compact-resource-action" href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${UI.escape(item.ctaLabel || "Open Resource")} ${UI.icon("arrow-up-right")}</a>` : ""}
+        ${UI.relatedItemsSection(item)}
       </div>
     `;
   };
@@ -486,8 +522,8 @@
       <div id="guidance-image-viewer" class="image-viewer" hidden role="dialog" aria-modal="true" aria-label="Guidance image viewer">
         <button type="button" class="image-viewer__backdrop" aria-label="Close image" onclick="closeGuidanceImage()"></button>
         <div class="image-viewer__panel">
-          <header><strong id="guidance-image-title">Guidance image</strong><button type="button" onclick="closeGuidanceImage()" aria-label="Close image">${UI.icon("x")}</button></header>
-          <img id="guidance-image-full" alt="">
+          <header><strong id="guidance-image-title">Guidance image</strong><div class="image-viewer__controls"><button type="button" onclick="zoomGuidanceImage(-0.25)" aria-label="Zoom out">${UI.icon("zoom-out")}</button><button type="button" onclick="resetGuidanceImageZoom()" aria-label="Reset zoom">100%</button><button type="button" onclick="zoomGuidanceImage(0.25)" aria-label="Zoom in">${UI.icon("zoom-in")}</button><a id="guidance-image-original" href="#" target="_blank" rel="noopener noreferrer" aria-label="Open full-size image">${UI.icon("maximize-2")}</a><button type="button" onclick="closeGuidanceImage()" aria-label="Close image">${UI.icon("x")}</button></div></header>
+          <div class="image-viewer__canvas"><img id="guidance-image-full" alt=""></div>
         </div>
       </div>
     `);
@@ -497,6 +533,9 @@
       document.getElementById("guidance-image-title").textContent = name || "Guidance image";
       image.src = src;
       image.alt = name || "Guidance image";
+      document.getElementById("guidance-image-original").href = src;
+      window.__guidanceImageZoom = 1;
+      image.style.transform = "scale(1)";
       viewer.hidden = false;
       document.body.classList.add("has-modal");
     };
@@ -504,6 +543,16 @@
       const viewer = document.getElementById("guidance-image-viewer");
       if (viewer) viewer.hidden = true;
       document.body.classList.remove("has-modal");
+    };
+    window.zoomGuidanceImage = function zoomGuidanceImage(change) {
+      const image = document.getElementById("guidance-image-full");
+      window.__guidanceImageZoom = Math.min(4, Math.max(.5, (window.__guidanceImageZoom || 1) + change));
+      if (image) image.style.transform = `scale(${window.__guidanceImageZoom})`;
+    };
+    window.resetGuidanceImageZoom = function resetGuidanceImageZoom() {
+      const image = document.getElementById("guidance-image-full");
+      window.__guidanceImageZoom = 1;
+      if (image) image.style.transform = "scale(1)";
     };
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") window.closeGuidanceImage();

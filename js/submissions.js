@@ -4,7 +4,9 @@
   const state = {
     access: null,
     accessPromise: null,
-    activeTab: "resource"
+    activeTab: "resource",
+    relatedTargetId: "",
+    relatedTargetTitle: ""
   };
 
   const UI = () => window.BOTSOP_UI;
@@ -133,9 +135,13 @@
         <div class="submission-editor__toolbar" data-editor-toolbar="${escape(id)}">
           <button type="button" data-action="bold" title="Bold">B</button>
           <button type="button" data-action="italic" title="Italic"><em>I</em></button>
+          <button type="button" data-action="underline" title="Underline"><u>U</u></button>
           <button type="button" data-action="heading" title="Heading">H</button>
           <button type="button" data-action="bullets" title="Bulleted list">Bullets</button>
+          <button type="button" data-action="bullets2" title="Second-level bullets">--</button>
+          <button type="button" data-action="bullets3" title="Third-level bullets">---</button>
           <button type="button" data-action="numbers" title="Numbered list">Numbers</button>
+          <button type="button" data-action="divider" title="Divider">Divider</button>
           <button type="button" data-action="link" title="Link">Link</button>
         </div>
         <textarea id="${escape(id)}" ${required ? "required" : ""} placeholder="Write the proposed guidance here..."></textarea>
@@ -157,7 +163,7 @@
             <label class="submission-field"><span>Resource URL</span><input id="resource-url" type="url" placeholder="https://" required></label>
             <label class="submission-field submission-field--wide"><span>Search Keywords</span><input id="resource-keywords" placeholder="appeal, age gate, verification"><small>Separate keywords with commas.</small></label>
             ${selectorHtml("resource-workflow", false)}
-            ${editorHtml("resource-instruction", "Resource Description / Instructions", true)}
+            ${editorHtml("resource-instruction", "Resource Guidance", true)}
             <label class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><input id="resource-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="resource-screenshot-list"></span></label>
           </div>
           <div class="submission-form__actions"><span class="submission-status" id="resource-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit Resource</button></div>
@@ -179,7 +185,7 @@
             <label class="submission-field submission-field--wide"><span>Proposed Content Name</span><input id="update-title" maxlength="300" required></label>
             <div data-sop-only class="submission-conditional-wide">${selectorHtml("update-workflow", true)}</div>
             <label class="submission-field submission-field--wide"><span>Proposed Content Summary</span><textarea id="update-summary" maxlength="2000" required></textarea></label>
-            ${editorHtml("update-instruction", "Proposed Instructions / Message", true)}
+            ${editorHtml("update-instruction", "Proposed Guidance / Message", true)}
             <div data-sop-only class="submission-conditional-wide">${editorHtml("update-closing", "Proposed Closing Guidance", false)}</div>
             <label class="submission-field submission-field--wide" data-sop-only><span>Proposed Ticket Tag Display</span><textarea id="update-ticket-tags" maxlength="3000">Tag 1 | Tag 2 | Tag 3</textarea></label>
             <label class="submission-field" data-announcement-only hidden><span>Publish Date</span><input id="update-publish-date" type="date"></label>
@@ -188,6 +194,29 @@
             <section class="submission-upload"><strong>Screenshots</strong><small>Optional. Up to 3 images, 3 MB each.</small><div id="update-screenshot-options" class="submission-screenshot-options"><label><input type="radio" name="update-screenshot-action" value="Keep Existing" checked> Keep existing screenshots</label><label><input type="radio" name="update-screenshot-action" value="Remove Existing"> Remove existing screenshots</label></div><input id="update-screenshots" type="file" accept="image/*" multiple><span class="submission-upload-list" id="update-screenshot-list"></span></section>
           </div>
           <div class="submission-form__actions"><span class="submission-status" id="update-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit Update</button></div>
+        </form>
+      </section>
+    `;
+  }
+
+  function relatedSuggestionHtml() {
+    const resources = (window.baseModel?.documents || []).filter(item => item.recordId).sort((a, b) => a.title.localeCompare(b.title));
+    const tasks = (window.baseModel?.items || []).filter(item => item.recordId && !["Request Type", "Tool", "Link"].includes(item.displayType)).sort((a, b) => a.title.localeCompare(b.title));
+    return `
+      <section class="submission-panel" id="submission-related-panel">
+        <header><h2>Suggest a Related Resource or Task</h2><p>Send a direct link, existing Resource Hub entry, or existing SOP task to the same review queue.</p></header>
+        <form class="submission-form" id="related-suggestion-form">
+          <div class="submission-grid">
+            <div class="submission-related-target"><span>Suggestion for</span><strong id="related-target-title">${escape(state.relatedTargetTitle || "Choose an SOP entry first")}</strong></div>
+            <input id="related-target-id" type="hidden" value="${escape(state.relatedTargetId)}">
+            <label class="submission-field"><span>Suggestion Type</span><select id="related-kind"><option value="link">New direct link</option><option value="resource">Existing Resource Hub entry</option><option value="task">Existing SOP task</option></select></label>
+            <label class="submission-field" data-related-link><span>Link Name</span><input id="related-title" maxlength="300" placeholder="Name shown in Related Resources"></label>
+            <label class="submission-field" data-related-link><span>URL</span><input id="related-url" type="url" placeholder="https://"></label>
+            <label class="submission-field submission-field--wide" data-related-resource hidden><span>Resource Hub Entry</span><select id="related-resource-id">${optionList(resources.map(item => ({ value: item.recordId, title: item.title })), "Select an existing resource")}</select></label>
+            <label class="submission-field submission-field--wide" data-related-task hidden><span>SOP Task</span><select id="related-task-id">${optionList(tasks.map(item => ({ value: item.recordId, title: item.title })), "Select an existing SOP entry")}</select></label>
+            <label class="submission-field submission-field--wide"><span>Why should this be related?</span><textarea id="related-reason" maxlength="5000" required></textarea></label>
+          </div>
+          <div class="submission-form__actions"><span class="submission-status" id="related-status"></span><button class="submission-submit" type="submit">${UI().icon("send")} Submit Suggestion</button></div>
         </form>
       </section>
     `;
@@ -278,14 +307,18 @@
     let replacement = selected;
     if (action === "bold") replacement = `**${selected || "bold text"}**`;
     if (action === "italic") replacement = `*${selected || "italic text"}*`;
+    if (action === "underline") replacement = `__${selected || "underlined text"}__`;
     if (action === "heading") replacement = `## ${selected || "Heading"}`;
     if (action === "bullets") replacement = (selected || "List item").split("\n").map(line => `- ${line}`).join("\n");
+    if (action === "bullets2") replacement = (selected || "Nested list item").split("\n").map(line => `-- ${line}`).join("\n");
+    if (action === "bullets3") replacement = (selected || "Nested list item").split("\n").map(line => `--- ${line}`).join("\n");
     if (action === "numbers") replacement = (selected || "List item").split("\n").map((line, index) => `${index + 1}. ${line}`).join("\n");
     if (action === "link") {
       const url = window.prompt("Paste the link URL", "https://");
       if (!url) return;
       replacement = `[${selected || "Link text"}](${url})`;
     }
+    if (action === "divider") replacement = `\n___\n`;
     textarea.setRangeText(replacement, start, end, "end");
     textarea.dispatchEvent(new Event("input", { bubbles: true }));
     textarea.focus();
@@ -385,11 +418,16 @@
         ${recordId ? `<div class="submission-reference"><span>Reference ID</span><code>${escape(recordId)}</code></div>` : ""}
         <div class="submission-success-page__actions">
           <button type="button" class="primary-action" id="submit-another">Submit Another</button>
+          ${state.access?.canReviewUpdates ? `<button type="button" class="secondary-action" id="review-submissions-success">Review Submissions</button>` : ""}
           <button type="button" class="secondary-action" onclick="showHome()">Return to BOT SOP</button>
         </div>
       </section>
     `;
     document.getElementById("submit-another")?.addEventListener("click", showSubmissionCenter);
+    document.getElementById("review-submissions-success")?.addEventListener("click", () => {
+      showSubmissionCenter();
+      activateTab("review");
+    });
     UI().refreshIcons();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -476,6 +514,49 @@
     }
   }
 
+  async function submitRelatedSuggestion(event) {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    const targetId = document.getElementById("related-target-id")?.value || "";
+    if (!targetId) return setStatus("related-status", "Open the SOP entry first, then select Suggest a Related Resource or Task.", "error");
+    button.disabled = true;
+    try {
+      const kind = document.getElementById("related-kind").value;
+      const suggestionTitle = kind === "resource"
+        ? selectedText(document.getElementById("related-resource-id"))
+        : kind === "task"
+          ? selectedText(document.getElementById("related-task-id"))
+          : (document.getElementById("related-title")?.value || "");
+      const result = await request("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "relation_suggestion",
+          targetSopId: targetId,
+          targetTitle: state.relatedTargetTitle,
+          relationKind: kind,
+          title: suggestionTitle,
+          url: document.getElementById("related-url")?.value || "",
+          resourceId: document.getElementById("related-resource-id")?.value || "",
+          taskId: document.getElementById("related-task-id")?.value || "",
+          reason: document.getElementById("related-reason")?.value || ""
+        })
+      });
+      showSuccess("related-item suggestion", result.title || "Related item suggestion", result.recordId);
+    } catch (error) {
+      setStatus("related-status", error.message, "error");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function syncRelatedKind() {
+    const kind = document.getElementById("related-kind")?.value || "link";
+    document.querySelectorAll("[data-related-link]").forEach(element => { element.hidden = kind !== "link"; });
+    document.querySelectorAll("[data-related-resource]").forEach(element => { element.hidden = kind !== "resource"; });
+    document.querySelectorAll("[data-related-task]").forEach(element => { element.hidden = kind !== "task"; });
+  }
+
   function syncUpdateType() {
     const updateType = document.getElementById("update-type")?.value || "sop";
     const sopMode = updateType === "sop";
@@ -513,9 +594,11 @@
     const resource = document.getElementById("submission-resource-panel");
     const update = document.getElementById("submission-update-panel");
     const review = document.getElementById("submission-review-panel");
+    const related = document.getElementById("submission-related-panel");
     if (resource) resource.hidden = tab !== "resource";
     if (update) update.hidden = tab !== "update";
     if (review) review.hidden = tab !== "review";
+    if (related) related.hidden = tab !== "related";
   }
 
   function bindPage() {
@@ -527,10 +610,13 @@
     bindFileList("update-screenshots", "update-screenshot-list");
     document.getElementById("resource-submission-form")?.addEventListener("submit", submitResource);
     document.getElementById("update-submission-form")?.addEventListener("submit", submitUpdate);
+    document.getElementById("related-suggestion-form")?.addEventListener("submit", submitRelatedSuggestion);
     document.getElementById("update-type")?.addEventListener("change", syncUpdateType);
     document.getElementById("update-submission-type")?.addEventListener("change", syncScreenshotOptions);
+    document.getElementById("related-kind")?.addEventListener("change", syncRelatedKind);
     window.BOTSOP_REVIEWS?.bindPage?.();
     syncUpdateType();
+    syncRelatedKind();
     UI().refreshIcons();
   }
 
@@ -558,6 +644,7 @@
       resourceAllowed ? `<button type="button" class="submission-tab" data-tab="resource">${UI().icon("book-plus")} Submit Resource</button>` : "",
       updateAllowed ? `<button type="button" class="submission-tab" data-tab="update">${UI().icon("workflow")} Submit Update</button>` : "",
       reviewAllowed ? `<button type="button" class="submission-tab" data-tab="review">${UI().icon("clipboard-check")} Review Submissions</button>` : ""
+      ,resourceAllowed ? `<button type="button" class="submission-tab" data-tab="related">${UI().icon("link-2")} Suggest Related</button>` : ""
     ].filter(Boolean);
     target.innerHTML = `
       <div class="submission-page">
@@ -567,6 +654,7 @@
         ${resourceAllowed ? resourceFormHtml() : ""}
         ${updateAllowed ? updateFormHtml() : ""}
         ${reviewAllowed ? window.BOTSOP_REVIEWS.panelHtml() : ""}
+        ${resourceAllowed ? relatedSuggestionHtml() : ""}
       </div>
     `;
     bindPage();
@@ -577,5 +665,14 @@
     loadAccess,
     hasAnyAccess,
     showSubmissionCenter
+  };
+
+  window.openRelatedSuggestion = function openRelatedSuggestion(itemId) {
+    const item = window.baseModel?.find(itemId);
+    if (!item?.recordId) return;
+    state.relatedTargetId = item.recordId;
+    state.relatedTargetTitle = item.title;
+    showSubmissionCenter();
+    activateTab("related");
   };
 })();

@@ -131,11 +131,12 @@ window.appState = {
     if (searchInput) searchInput.value = "";
 
     const expectations = guidanceItemsFor("BOT Expectations");
+    const usdsCompliance = guidanceItemsFor("USDS JV Compliance");
     const outOfScope = uniqueItems([
       ...model.section("Callout", "OOS Routing"),
       ...model.documentsFor("OOS Routing")
     ]);
-    const ticketGuidance = guidanceItemsFor("Wrap Up");
+    const ticketGuidance = guidanceItemsForAny(["Ticket Guidance", "Wrap Up"]);
     const banOperatorsAndReasons = guidanceItemsForAny(["Ban Operators and Reasons", "Ban Operators", "Reasons"]);
     const warnings = model.section("Warning", "Policy Reminders");
 
@@ -143,11 +144,35 @@ window.appState = {
       <div class="page-stack">
         ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
         ${window.BOTSOP_UI.updatesCallout(window.baseMeta?.unacknowledgedUpdatesUrl)}
+        ${window.BOTSOP_UI.guidanceDropdownSection("USDS JV Compliance", "shield-check", usdsCompliance, "red", "Privacy, disclosure, and USDS JV handling requirements.")}
         ${window.BOTSOP_UI.expectationsSection(expectations, "Required standards and responsibilities for every ticket.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Out of Scope", "route", outOfScope, "blue", "Routing guidance for work that falls outside BOT scope.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Ticket Guidance", "circle-check-big", ticketGuidance, "violet", "Steps and reminders for handling and closing tickets.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Ban Operators and Reasons", "shield-check", banOperatorsAndReasons, "orange", "Guidance for selecting ban operators and reason codes.")}
         ${window.BOTSOP_UI.warningCards(warnings)}
+      </div>
+    `);
+  };
+
+  window.showOosRouting = function showOosRouting(addToHistory = true) {
+    const model = window.baseModel;
+    if (!model) return;
+    if (addToHistory) remember("oos", "oos-routing");
+    else {
+      window.appState.currentView = "oos";
+      window.appState.currentSection = "oos-routing";
+    }
+    window.setActiveNavigation(null);
+    const items = uniqueItems([
+      ...model.section("Callout", "OOS Routing"),
+      ...model.documentsFor("OOS Routing")
+    ]).sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+    renderAndRefresh(`
+      <div class="page-stack">
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><span>OOS Routing</span></nav>
+        <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon("route")}</span><div><h2>All OOS Routing</h2><p>${items.length} active destination${items.length === 1 ? "" : "s"}.</p></div></header>
+        <div class="process-grid">${items.map(window.BOTSOP_UI.processCard).join("")}</div>
+        ${!items.length ? `<section class="empty-state"><h2>No OOS destinations available</h2><p>Active OOS records will appear here.</p></section>` : ""}
       </div>
     `);
   };
@@ -174,7 +199,7 @@ window.appState = {
       const parsed = Date.parse(raw);
       return Number.isFinite(parsed) ? parsed : 0;
     };
-    const items = unique.sort((a, b) => parseDate(b.publishDate || b.lastUpdated) - parseDate(a.publishDate || a.lastUpdated) || a.title.localeCompare(b.title));
+    const items = unique.sort((a, b) => parseDate(b.updateDateRaw || b.publishDate || b.lastUpdated) - parseDate(a.updateDateRaw || a.publishDate || a.lastUpdated) || a.title.localeCompare(b.title));
     window.setActiveNavigation(null);
     renderAndRefresh(`
       <div class="page-stack">
@@ -241,7 +266,7 @@ window.appState = {
       <div class="page-stack">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(parent.title)}</span></nav>
         <header class="process-header"><span class="process-header__icon">${window.BOTSOP_UI.icon(parent.icon || "circle-check-big")}</span><div><p>Ticket Guidance</p><h1>${window.BOTSOP_UI.escape(parent.title)}</h1><span>${window.BOTSOP_UI.escape(parent.summary || "Complete each step before closing the ticket.")}</span></div></header>
-        ${parent.instruction ? window.BOTSOP_UI.markdownSection("Overview", "clipboard-check", parent.instruction) : ""}
+        ${parent.instruction ? window.BOTSOP_UI.markdownSection("Guidance", "clipboard-check", parent.instruction) : ""}
         <section class="process-group"><header><div><h2>Ticket Guidance Steps</h2><p>Select a step to view its full guidance.</p></div></header><div class="process-grid">${steps.map(window.BOTSOP_UI.processCard).join("")}</div></section>
         ${!steps.length ? `<section class="empty-state"><h2>No steps mapped yet</h2><p>Add Checklist Step records with <strong>${window.BOTSOP_UI.escape(parent.title)}</strong> in Parent.</p></section>` : ""}
       </div>
@@ -269,6 +294,7 @@ window.appState = {
       : null;
     window.setActiveNavigation(requestType?.id || null);
 
+    const badge = window.BOTSOP_UI.itemBadge(item);
     const meta = [
       item.status && `<span>${window.BOTSOP_UI.icon("circle-dot")} ${window.BOTSOP_UI.escape(item.status)}</span>`,
       item.lastUpdated && `<span>${window.BOTSOP_UI.icon("calendar-clock")} Updated ${window.BOTSOP_UI.escape(item.lastUpdated)}</span>`,
@@ -287,16 +313,15 @@ window.appState = {
         </nav>
         <header class="record-header">
           <span class="record-header__icon">${window.BOTSOP_UI.icon(item.icon || "file-text")}</span>
-          <div>${item.baseSection ? `<p>${window.BOTSOP_UI.escape(item.baseSection)}</p>` : ""}<h1>${window.BOTSOP_UI.escape(item.title)}</h1>${item.summary ? `<span>${window.BOTSOP_UI.escape(item.summary)}</span>` : ""}</div>
+          <div>${item.baseSection ? `<p>${window.BOTSOP_UI.escape(item.baseSection)}</p>` : ""}<h1>${window.BOTSOP_UI.escape(item.title)}${badge ? `<span class="entry-new-badge entry-new-badge--header">${window.BOTSOP_UI.escape(badge)}</span>` : ""}</h1>${item.summary ? `<span>${window.BOTSOP_UI.escape(item.summary)}</span>` : ""}</div>
         </header>
         <div class="record-meta">${meta}</div>
-        ${window.BOTSOP_UI.markdownSection("Instructions", "clipboard-list", item.instruction)}
+        ${window.BOTSOP_UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
         ${window.BOTSOP_UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${window.BOTSOP_UI.imageGallery(item.screenshots)}
         ${window.BOTSOP_UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
         ${window.BOTSOP_UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
-        ${window.BOTSOP_UI.relatedItemsSection(item.relatedResources, item.linkedTasks)}
-        ${item.url ? `<a class="primary-action" href="${window.BOTSOP_UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">${window.BOTSOP_UI.escape(item.ctaLabel)} ${window.BOTSOP_UI.icon("arrow-up-right")}</a>` : ""}
+        ${window.BOTSOP_UI.relatedItemsSection(item)}
       </article>
     `);
   };
@@ -309,6 +334,7 @@ window.appState = {
     if (prior.view === "search") return window.showSearch(prior.query, false, prior.scrollY);
     if (prior.view === "favorites") return window.showFavorites(false);
     if (prior.view === "updates") return window.showUpdateArchive(prior.id, false);
+    if (prior.view === "oos") return window.showOosRouting(false);
     return window.showRecord(prior.id, false);
   };
 
@@ -581,6 +607,7 @@ window.appState = {
       window.buildLeftNavigation();
       window.BOTSOP_UI.renderRightRail(window.baseModel);
       window.BOTSOP_UI.installImageViewer();
+      if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
       installCombinedSearch();
       installAdvancedSearch();
       const signedIn = document.getElementById("signed-in-user");
@@ -615,4 +642,8 @@ window.appState = {
   }
 
   initializeApp();
+
+  window.refreshBotSop = function refreshBotSop() {
+    window.BOTSOP_DATA_CACHE?.refresh?.();
+  };
 })();

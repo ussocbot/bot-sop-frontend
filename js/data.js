@@ -23,8 +23,10 @@ window.navigationItems = [];
     "request types": "Request Types",
     "process content": "Process Content",
     "bot expectations": "BOT Expectations",
+    "usds jv compliance": "USDS JV Compliance",
     "best practices": "Best Practices",
     "wrap up": "Wrap Up",
+    "ticket guidance": "Ticket Guidance",
     "ban operators and reasons": "Ban Operators and Reasons",
     "oos routing": "OOS Routing",
     "bot tools": "BOT Tools",
@@ -79,9 +81,12 @@ window.navigationItems = [];
     "Process Group|Process Content": "center submenu",
     "Process|Process Content": "center process content",
     "Section|BOT Expectations": "BOT Expectations homepage section",
+    "Section|USDS JV Compliance": "USDS JV Compliance homepage section",
     "Section|Best Practices": "Best Practices homepage section",
     "Checklist|Wrap Up": "Wrap Up homepage section",
     "Checklist Step|Wrap Up": "nested Wrap Up step",
+    "Checklist|Ticket Guidance": "Ticket Guidance homepage section",
+    "Checklist Step|Ticket Guidance": "nested Ticket Guidance step",
     "Section|Ban Operators and Reasons": "Ban Operators and Reasons homepage section",
     "Callout|OOS Routing": "left OOS Routing card",
     "Tool|BOT Tools": "right BOT Tools card",
@@ -312,6 +317,7 @@ window.navigationItems = [];
       Link: ["link", "external-link", "bookmark", "book-marked"],
       News: ["megaphone", "newspaper", "bell", "radio"],
       "SOP Update": ["file-clock", "refresh-cw", "history", "calendar-clock"],
+      "Macro Update": ["message-square-more", "messages-square", "notebook-tabs", "text-quote"],
       Warning: ["shield-alert", "triangle-alert", "badge-alert", "circle-alert"]
     };
     const choices = pools[record.displayType] || pools.Process;
@@ -326,7 +332,7 @@ window.navigationItems = [];
     if (usedIds.has(id)) id = `${id}-${String(record.record_id || index).slice(-6)}`;
     usedIds.add(id);
 
-    const instruction = richTextValue(findField(fields, ["Instruction", "Content", "Guidance"]));
+    const instruction = richTextValue(findField(fields, ["Guidance", "Instructions", "Instruction", "Content"]));
     const displayType = canonical(
       findField(fields, ["Display Type"]),
       DISPLAY_TYPES,
@@ -368,6 +374,8 @@ window.navigationItems = [];
       parentIds: relationIds(findField(fields, ["Parent"])),
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
+      quickAccess: boolValue(findField(fields, ["Quick Access", "Quick Access OOS"]), false),
+      specialType: textValue(findField(fields, ["Special Type"])),
       status: textValue(findField(fields, ["Status"])),
       published: boolValue(findField(fields, ["Published"]), true),
       url: deepUrl(findField(fields, ["URL", "Link"])) || urlValue(findField(fields, ["URL", "Link"])),
@@ -377,6 +385,7 @@ window.navigationItems = [];
       featuredIn: [...new Set(featuredIn)],
       featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
+      updateDateRaw: textValue(findField(fields, ["Update Date", "Last Updated"])),
       lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated"])) || "Not available",
       screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
       screenshots: [...attachmentList(rawScreenshots), ...guidanceAttachments],
@@ -418,7 +427,7 @@ window.navigationItems = [];
       title,
       summary,
       description: summary,
-      instruction: richTextValue(findField(fields, ["Instruction", "Content", "Guidance", "Details"])),
+      instruction: richTextValue(findField(fields, ["Guidance", "Instructions", "Instruction", "Content", "Details"])),
       url: deepUrl(findField(fields, ["URL", "Link", "Resource URL"])) || urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       iconKey: textValue(findField(fields, ["Icon Key", "Icon"])),
@@ -426,8 +435,10 @@ window.navigationItems = [];
       websitePlacements: listValue(findField(fields, ["Website Placement", "Website Placements"])),
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
+      quickAccess: boolValue(findField(fields, ["Quick Access", "Quick Access OOS"]), false),
       published: boolValue(findField(fields, ["Published"]), true),
       status: textValue(findField(fields, ["Status"])),
+      updateDateRaw: textValue(findField(fields, ["Update Date", "Last Updated", "Updated"])),
       lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated", "Updated"])) || "Not available",
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
       appearsIn: [],
@@ -549,7 +560,7 @@ window.navigationItems = [];
         return publishedItems
           .filter(item => item.featuredIn.some(value => placementAliases.has(normalizeKey(value))))
           .map(item => {
-            const raw = String(item.publishDate || "").trim();
+            const raw = String(item.updateDateRaw || item.publishDate || "").trim();
             const publishedAt = /^\d{10,13}$/.test(raw)
               ? (raw.length === 10 ? Number(raw) * 1000 : Number(raw))
               : Date.parse(raw);
@@ -574,7 +585,7 @@ window.navigationItems = [];
       },
       wrapStepsFor(parent) {
         return publishedItems
-          .filter(item => item.displayType === "Checklist Step" && item.baseSection === "Wrap Up")
+          .filter(item => item.displayType === "Checklist Step" && ["Wrap Up", "Ticket Guidance"].includes(item.baseSection))
           .filter(item =>
             item.parentIds.includes(parent.recordId) ||
             item.parents.some(value => normalizeKey(value) === normalizeKey(parent.title))
@@ -646,8 +657,8 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v14";
-  const DATA_CACHE_TTL = 60 * 1000;
+  const DATA_CACHE_KEY = "botsop:base-data:v15";
+  const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {
     window.baseModel = buildModel(payload.records || [], payload.documentationRecords || []);
@@ -695,11 +706,16 @@ window.navigationItems = [];
     return payload;
   }
 
-  window.BOTSOP_DATA_CACHE = { clear: clearCache };
+  window.BOTSOP_DATA_CACHE = {
+    clear: clearCache,
+    refresh() {
+      clearCache();
+      window.location.reload();
+    }
+  };
   const cachedPayload = readCache();
   if (cachedPayload) {
     window.baseDataReady = Promise.resolve(installPayload(cachedPayload));
-    fetchPayload().catch(error => console.warn("Background Base refresh failed", error));
   } else {
     window.baseDataReady = fetchPayload().then(installPayload);
   }
