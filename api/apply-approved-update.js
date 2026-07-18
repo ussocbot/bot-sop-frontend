@@ -66,7 +66,7 @@ function attachmentTokens(value, found = new Set(), seen = new Set()) {
 
 function deepUrl(value, seen = new Set()) {
   if (!value) return "";
-  if (typeof value === "string") return value.match(/https?:\/\/[^\s<>"]+/i)?.[0]?.replace(/[),.;!?]+$/, "") || "";
+  if (typeof value === "string") return value.match(/https?:\/\/[^\s<>\"]+/i)?.[0]?.replace(/[),.;!?]+$/, "") || "";
   if (typeof value !== "object" || seen.has(value)) return "";
   seen.add(value);
   for (const nested of Object.values(value)) {
@@ -214,18 +214,15 @@ module.exports = async function handler(req, res) {
       const targetId = linkedIds(findField(fields, ["Verified Replacement Target"]))[0] ||
         linkedIds(findField(fields, ["Suggested Existing SOP"]))[0] || "";
       if (submissionType === "New SOP") {
-        const requestType = textValue(findField(fields, ["Proposed Request Type"]));
-        const parentId = linkedIds(findField(fields, ["Proposed Parent"]))[0] || "";
-        if (!requestType) throw new Error("A Request Type / Section is required for a new SOP");
+        const category = textValue(findField(fields, ["Proposed Request Type"]));
+        if (!category) throw new Error("A Left Nav category is required for a new SOP");
         Object.assign(liveFields, {
-          "Record Key": `process-${slug(title)}-${Date.now().toString(36)}`,
-          "Display Type": "Process",
-          "Base Section": "Process Content",
-          "Appears In": [requestType],
+          "Record Key": `content-${slug(title)}-${Date.now().toString(36)}`,
+          "Display Type": "Content",
+          "Appears In": [category],
           "Status": "Active",
           "Published": true
         });
-        if (parentId) liveFields.Parent = [parentId];
         if (sendNotification) liveFields["Featured In"] = ["SOP Updates"];
         liveRecord = await writeRecord(config, liveTableId, liveFields);
       } else {
@@ -274,8 +271,7 @@ module.exports = async function handler(req, res) {
       const isNews = updateType === "Important News";
       Object.assign(liveFields, {
         "Record Key": `${isNews ? "news" : "macro-update"}-${slug(title)}-${Date.now().toString(36)}`,
-        "Display Type": isNews ? "News" : "Macro Update",
-        "Base Section": isNews ? "Important News" : "Macro Updates",
+        "Display Type": isNews ? "Important News" : "Macro Updates",
         "Publish Date": dateNumber(findField(fields, ["Proposed Publish Date"])),
         "Status": "Active",
         "Published": isNews

@@ -123,9 +123,9 @@
   }
 
   function contextItems(category) {
-    const items = (window.baseModel?.items || []).filter(item => item.displayType !== "Request Type");
+    const items = (window.baseModel?.items || []).filter(item => item.displayType === "Content");
     if (key(category) === "out of scope") {
-      return items.filter(item => key(item.baseSection) === "oos routing" || appearsIn(item, "OOS Routing") || appearsIn(item, "Out of Scope"));
+      return items.filter(item => appearsIn(item, "OOS Routing") || appearsIn(item, "Out of Scope"));
     }
     return items.filter(item => appearsIn(item, category));
   }
@@ -137,20 +137,11 @@
   }
 
   function groupChoices(category) {
-    return contextItems(category)
-      .filter(item => item.displayType === "Process Group")
-      .sort((a, b) => a.title.localeCompare(b.title));
+    return [];
   }
 
   function targetChoices(category, groupId = "") {
-    const candidates = contextItems(category).filter(item => item.displayType !== "Process Group");
-    if (!groupId) return candidates.sort((a, b) => a.title.localeCompare(b.title));
-    const group = modelItem(groupId);
-    if (!group) return [];
-    return candidates.filter(item =>
-      (item.parentIds || []).includes(group.recordId) ||
-      (item.parents || []).some(parent => key(parent) === key(group.title))
-    ).sort((a, b) => a.title.localeCompare(b.title));
+    return contextItems(category).sort((a, b) => a.title.localeCompare(b.title));
   }
 
   function options(items, placeholder, selected = "", value = item => item, label = item => item) {
@@ -189,7 +180,7 @@
 
   function relationDetailHtml(item, current) {
     const resources = (window.baseModel?.documents || []).filter(entry => entry.recordId).sort((a, b) => a.title.localeCompare(b.title));
-    const tasks = (window.baseModel?.items || []).filter(entry => entry.recordId && !["Request Type", "Tool", "Link"].includes(entry.displayType)).sort((a, b) => a.title.localeCompare(b.title));
+    const tasks = (window.baseModel?.items || []).filter(entry => entry.recordId && entry.displayType === "Content").sort((a, b) => a.title.localeCompare(b.title));
     const type = item.relationSuggestionType || "New Link";
     return `
       <section class="review-detail" data-review-record="${escape(item.recordId)}">
@@ -236,9 +227,7 @@
     const targetId = item.verifiedTargetId || item.suggestedTargetId;
     const current = modelItem(targetId);
     const category = item.proposedRequestType || current?.appearsIn?.[0] || "";
-    const parentId = item.proposedParentId || current?.parentIds?.[0] || "";
-    const groups = category ? groupChoices(category) : [];
-    const targets = category && (!groups.length || parentId) ? targetChoices(category, parentId) : [];
+    const targets = category ? targetChoices(category) : [];
     if (item.updateType === "Related Item Suggestion") return relationDetailHtml(item, current);
     return `
       <section class="review-detail" data-review-record="${escape(item.recordId)}">
@@ -252,14 +241,13 @@
           <div class="submission-grid">
             ${isSop ? `
               <label class="submission-field"><span>SOP Change Type</span><select id="review-submission-type">
-                ${["New SOP", "Update Existing SOP", "Correction"].map(value => `<option value="${value}"${item.submissionType === value ? " selected" : ""}>${value}</option>`).join("")}
+                ${["New SOP", "Update Existing SOP", "Replace Existing SOP", "Correction"].map(value => `<option value="${value}"${item.submissionType === value ? " selected" : ""}>${value}</option>`).join("")}
               </select></label>
               <div class="workflow-selector">
-                <header><h3>Verified workflow and replacement target</h3><p>Each level becomes available after the preceding level is selected.</p></header>
+                <header><h3>Verified category and replacement target</h3><p>Select the left navigation category, then choose the existing guidance.</p></header>
                 <div class="workflow-selector__fields">
-                  <label class="submission-field"><span>Request Type / Section</span><select id="review-category">${options(categoryChoices(), "Select a request type", category)}</select></label>
-                  <label class="submission-field"><span>Workflow Family</span><select id="review-group"${!groups.length ? " disabled" : ""}>${groups.length ? options(groups, "Select a workflow family", parentId, entry => entry.recordId, entry => entry.title) : `<option value="">No workflow family required</option>`}</select></label>
-                  <label class="submission-field"><span>Existing Guidance</span><select id="review-target"${groups.length && !parentId ? " disabled" : ""}>${options(targets, groups.length && !parentId ? "Select a workflow family first" : "Select existing guidance", targetId, entry => entry.recordId, entry => entry.title)}</select></label>
+                  <label class="submission-field"><span>Left Navigation Category</span><select id="review-category">${options(categoryChoices(), "Select a category", category)}</select></label>
+                  <label class="submission-field"><span>Existing Guidance</span><select id="review-target">${options(targets, "Select existing guidance", targetId, entry => entry.recordId, entry => entry.title)}</select></label>
                 </div>
               </div>
             ` : `
@@ -316,27 +304,14 @@
 
   function bindReviewWorkflow(item) {
     const category = document.getElementById("review-category");
-    const group = document.getElementById("review-group");
     const target = document.getElementById("review-target");
     const current = document.getElementById("review-current-guidance");
-    if (!category || !group || !target || !current) return;
+    if (!category || !target || !current) return;
 
     category.addEventListener("change", () => {
-      const groups = groupChoices(category.value);
-      group.innerHTML = groups.length
-        ? options(groups, "Select a workflow family", "", entry => entry.recordId, entry => entry.title)
-        : `<option value="">No workflow family required</option>`;
-      group.disabled = !groups.length;
-      const targets = groups.length ? [] : targetChoices(category.value);
-      target.innerHTML = options(targets, groups.length ? "Select a workflow family first" : "Select existing guidance", "", entry => entry.recordId, entry => entry.title);
-      target.disabled = Boolean(groups.length);
-      current.innerHTML = currentGuidanceHtml(null);
-    });
-
-    group.addEventListener("change", () => {
-      const targets = group.value ? targetChoices(category.value, group.value) : [];
+      const targets = targetChoices(category.value);
       target.innerHTML = options(targets, "Select existing guidance", "", entry => entry.recordId, entry => entry.title);
-      target.disabled = !group.value;
+      target.disabled = !category.value;
       current.innerHTML = currentGuidanceHtml(null);
     });
 
@@ -444,7 +419,7 @@
             updateType: item.updateType,
             submissionType: document.getElementById("review-submission-type")?.value || item.submissionType,
             proposedRequestType: document.getElementById("review-category")?.value || item.proposedRequestType,
-            proposedParentId: document.getElementById("review-group")?.value || "",
+            proposedParentId: "",
             verifiedTargetId: document.getElementById("review-target")?.value || "",
             title: document.getElementById("review-title")?.value || "",
             summary: document.getElementById("review-summary")?.value || "",

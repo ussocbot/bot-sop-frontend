@@ -119,13 +119,13 @@
   };
 
   UI.actionAttributes = function actionAttributes(item) {
-    if ((item.isFeatured || ["News", "SOP Update", "Macro Update"].includes(item.displayType)) && item.id) {
+    if ((item.isFeatured || ["Important News", "SOP Updates", "Macro Updates"].includes(item.displayType)) && item.id) {
       return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
     }
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
-    if (["Link", "Tool"].includes(item.displayType)) {
+    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType)) {
       return `href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"`;
     }
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
@@ -144,7 +144,7 @@
   };
 
   UI.sidebarCard = function sidebarCard(title, iconName, items, tone, collapsible = false, viewAllKey = "", totalCount = items.length) {
-    const showDescriptions = !["BOT Tools", "OPUS Links", "QA Links"].includes(title);
+    const showDescriptions = !["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(title);
     const cardTag = collapsible ? "details" : "section";
     const headerTag = collapsible ? "summary" : "header";
     return `
@@ -157,12 +157,12 @@
           ${items.length ? items.map(item => {
             const badge = UI.itemBadge(item);
             return `
-            <a class="side-card__item${["Link", "Tool"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
+            <a class="side-card__item${["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
                 <span class="side-card__title"><strong>${UI.escape(item.title)}</strong>${badge ? `<em class="side-card__badge">${UI.escape(badge)}</em>` : ""}</span>
                 ${showDescriptions && item.summary ? `<small>${UI.escape(item.summary)}</small>` : ""}
               </span>
-              ${UI.icon(item.displayType === "Link" ? "arrow-up-right" : (item.url ? "arrow-up-right" : "chevron-right"))}
+              ${UI.icon(item.url ? "arrow-up-right" : "chevron-right")}
             </a>
           `; }).join("") : `<p class="side-card__empty">No published items mapped here.</p>`}
         </div>
@@ -184,16 +184,17 @@
       };
       return parse(b.updateDateRaw || b.publishDate || b.lastUpdated) - parse(a.updateDateRaw || a.publishDate || a.lastUpdated) || (b.priority || 0) - (a.priority || 0) || a.title.localeCompare(b.title);
     });
-    const importantNews = newestFirst([...model.featuredFor("Important News"), ...model.section("News", "Important News")]);
-    const sopUpdates = newestFirst([...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")]);
-    const macroUpdates = newestFirst(model.section("Macro Update", "Macro Updates"));
+    const importantNews = newestFirst([...model.featuredFor("Important News"), ...model.section("Important News")]);
+    const sopUpdates = newestFirst([...model.featuredFor("SOP Updates"), ...model.section("SOP Updates")]);
+    const macroUpdates = newestFirst(model.section("Macro Updates"));
     rail.innerHTML = [
       UI.sidebarCard("Important News", "megaphone", importantNews.slice(0, 4), "red", false, "important-news", importantNews.length),
       UI.sidebarCard("SOP Updates", "file-clock", sopUpdates.slice(0, 4), "yellow", false, "sop-updates", sopUpdates.length),
       macroUpdates.length ? UI.sidebarCard("Macro Updates", "message-square-more", macroUpdates.slice(0, 4), "teal", false, "macro-updates", macroUpdates.length) : "",
-      UI.sidebarCard("BOT Tools", "wrench", [...model.section("Tool", "BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
-      UI.sidebarCard("OPUS Links", "link", [...model.section("Link", "OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
-      UI.sidebarCard("QA Links", "badge-check", [...model.section("Link", "QA Links"), ...model.documentsFor("QA Links")], "teal", true)
+      UI.sidebarCard("BOT Tools", "wrench", [...model.section("BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
+      UI.sidebarCard("BOT Links", "bot", [...model.section("BOT Links"), ...model.documentsFor("BOT Links")], "blue", true),
+      UI.sidebarCard("OPUS Links", "link", [...model.section("OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
+      UI.sidebarCard("QA Links", "badge-check", [...model.section("QA Links"), ...model.documentsFor("QA Links")], "teal", true)
     ].join("");
     rail.querySelectorAll("details[data-right-card-accordion]").forEach(card => {
       card.addEventListener("toggle", () => {
@@ -266,7 +267,7 @@
       <section class="request-area">
         <header class="section-title">
           <span class="section-title__icon">${UI.icon("layout-grid")}</span>
-          <div><h2>Review by Request Type</h2><p>Select the ticket or product area you are reviewing.</p></div>
+          <div><h2>Guidance Categories</h2><p>Select the ticket or product area you are reviewing.</p></div>
         </header>
         <div class="request-grid">
           ${requestTypes.map(item => `
@@ -295,8 +296,8 @@
     return `
       <details class="mapping-alert">
         <summary>${UI.icon("triangle-alert")} ${items.length} published record${items.length === 1 ? "" : "s"} need mapping</summary>
-        <p>These records are intentionally not placed because their Display Type and Base Section combination is not part of the layout contract.</p>
-        <ul>${items.map(item => `<li><strong>${UI.escape(item.title)}</strong>: ${UI.escape(item.displayType || "blank")} / ${UI.escape(item.baseSection || "blank")}</li>`).join("")}</ul>
+        <p>These records have a blank or unrecognized Display Type.</p>
+        <ul>${items.map(item => `<li><strong>${UI.escape(item.title)}</strong>: ${UI.escape(item.mappingIssue || item.displayType || "Display Type is blank")}</li>`).join("")}</ul>
       </details>
     `;
   };

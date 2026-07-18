@@ -6,7 +6,8 @@
     accessPromise: null,
     activeTab: "resource",
     relatedTargetId: "",
-    relatedTargetTitle: ""
+    relatedTargetTitle: "",
+    updateTargetId: ""
   };
 
   const UI = () => window.BOTSOP_UI;
@@ -53,6 +54,10 @@
     return Boolean(state.access?.canSubmitResources || state.access?.canSubmitUpdates || state.access?.canSubmitSopUpdates || state.access?.canReviewUpdates);
   }
 
+  function canSubmitUpdates() {
+    return Boolean(state.access?.canSubmitUpdates || state.access?.canSubmitSopUpdates);
+  }
+
   function itemAppearsIn(item, placement) {
     const wanted = key(placement);
     return (item.appearsIn || []).some(value => key(value) === wanted);
@@ -60,10 +65,9 @@
 
   function contextItems(category) {
     const model = window.baseModel;
-    const items = (model?.items || []).filter(item => item.displayType !== "Request Type");
+    const items = (model?.items || []).filter(item => item.displayType === "Content");
     if (key(category) === "out of scope") {
       return items.filter(item =>
-        key(item.baseSection) === "oos routing" ||
         itemAppearsIn(item, "OOS Routing") ||
         itemAppearsIn(item, "Out of Scope")
       );
@@ -78,30 +82,11 @@
   }
 
   function groupChoices(category) {
-    const items = contextItems(category);
-    const groups = items
-      .filter(item => item.displayType === "Process Group")
-      .map(item => ({ value: item.title, title: item.title, recordId: item.recordId || "" }));
-    const existing = new Set(groups.map(item => key(item.title)));
-    items.flatMap(item => item.parents || []).forEach(parent => {
-      if (!existing.has(key(parent))) {
-        existing.add(key(parent));
-        groups.push({ value: parent, title: parent, recordId: "" });
-      }
-    });
-    return groups.sort((a, b) => a.title.localeCompare(b.title));
+    return [];
   }
 
   function targetChoices(category, group) {
-    const all = contextItems(category).filter(item => item.displayType !== "Process Group");
-    if (!group) return all.sort((a, b) => a.title.localeCompare(b.title));
-    const wanted = key(group);
-    const groupRecord = contextItems(category).find(item => item.displayType === "Process Group" && key(item.title) === wanted);
-    const children = all.filter(item =>
-      (item.parents || []).some(parent => key(parent) === wanted) ||
-      (groupRecord?.recordId && (item.parentIds || []).includes(groupRecord.recordId))
-    );
-    return (children.length ? children : all).sort((a, b) => a.title.localeCompare(b.title));
+    return contextItems(category).sort((a, b) => a.title.localeCompare(b.title));
   }
 
   function optionList(items, placeholder, valueKey = "value", titleKey = "title") {
@@ -118,8 +103,7 @@
           <p>The choices below are populated from active records in the SOP Base.</p>
         </header>
         <div class="workflow-selector__fields">
-          <label class="submission-field"><span>Request Type / Section</span><select id="${escape(prefix)}-category" ${required ? "required" : ""}></select></label>
-          <label class="submission-field"><span>Workflow Family</span><select id="${escape(prefix)}-group" disabled></select></label>
+          <label class="submission-field"><span>Left Navigation Category</span><select id="${escape(prefix)}-category" ${required ? "required" : ""}></select></label>
           <label class="submission-field"><span>Existing Guidance</span><select id="${escape(prefix)}-target" disabled></select></label>
         </div>
         <div class="workflow-path" id="${escape(prefix)}-path"><span>No workflow selected</span></div>
@@ -180,7 +164,7 @@
           <div class="submission-grid">
             <div class="submission-type-row">
               <label class="submission-field"><span>Update Type</span><select id="update-type" required><option value="sop" selected>SOP Update</option><option value="important_news">Important News</option><option value="macro_update">Macro Update</option></select><small id="update-type-confirmation">SOP workflow fields are active.</small></label>
-              <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select><small>Choose whether this replaces existing guidance or creates a new SOP.</small></label>
+              <label class="submission-field" data-sop-only><span>SOP Change Type</span><select id="update-submission-type"><option value="Update Existing SOP">Update Existing SOP</option><option value="Replace Existing SOP">Replace Existing SOP</option><option value="Correction">Correction</option><option value="New SOP">New SOP</option></select><small>Update pre-fills the current guidance. Replace starts with blank proposed fields.</small></label>
             </div>
             <label class="submission-field submission-field--wide"><span>Proposed Content Name</span><input id="update-title" maxlength="300" required></label>
             <div data-sop-only class="submission-conditional-wide">${selectorHtml("update-workflow", true)}</div>
@@ -201,7 +185,7 @@
 
   function relatedSuggestionHtml() {
     const resources = (window.baseModel?.documents || []).filter(item => item.recordId).sort((a, b) => a.title.localeCompare(b.title));
-    const tasks = (window.baseModel?.items || []).filter(item => item.recordId && !["Request Type", "Tool", "Link"].includes(item.displayType)).sort((a, b) => a.title.localeCompare(b.title));
+    const tasks = (window.baseModel?.items || []).filter(item => item.recordId && item.displayType === "Content").sort((a, b) => a.title.localeCompare(b.title));
     return `
       <section class="submission-panel" id="submission-related-panel">
         <header><h2>Suggest a Related Resource or Task</h2><p>Send a direct link, existing Resource Hub entry, or existing SOP task to the same review queue.</p></header>
@@ -246,20 +230,83 @@
     `;
   }
 
+  function setFormValue(id, value, notify = false) {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.value = value == null ? "" : String(value);
+    if (notify) element.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function fillUpdateFields(item) {
+    if (!item) return;
+    setFormValue("update-title", item.title);
+    setFormValue("update-summary", item.summary);
+    setFormValue("update-instruction", item.instruction, true);
+    setFormValue("update-closing", item.closingGuidance, true);
+    setFormValue("update-ticket-tags", item.ticketTagDisplay);
+    const keep = document.querySelector('input[name="update-screenshot-action"][value="Keep Existing"]');
+    if (keep) keep.checked = true;
+  }
+
+  function clearProposedUpdateFields() {
+    setFormValue("update-title", "");
+    setFormValue("update-summary", "");
+    setFormValue("update-instruction", "", true);
+    setFormValue("update-closing", "", true);
+    setFormValue("update-ticket-tags", "");
+  }
+
+  function selectedUpdateItem() {
+    const targetId = document.getElementById("update-workflow-target")?.value || "";
+    return window.baseModel?.items.find(item => item.recordId === targetId) || null;
+  }
+
+  function maybeFillSelectedUpdate() {
+    if (document.getElementById("update-submission-type")?.value !== "Update Existing SOP") return;
+    fillUpdateFields(selectedUpdateItem());
+  }
+
+  function chooseWorkflowForItem(item) {
+    if (!item?.recordId) return;
+    const category = document.getElementById("update-workflow-category");
+    const target = document.getElementById("update-workflow-target");
+    if (!category || !target) return;
+
+    const matchingCategory = categoryChoices().find(title =>
+      contextItems(title).some(candidate => candidate.recordId === item.recordId)
+    ) || (item.appearsIn || []).find(title => [...category.options].some(option => option.value === title));
+    if (!matchingCategory) return;
+
+    category.value = matchingCategory;
+    category.dispatchEvent(new Event("change", { bubbles: true }));
+    if ([...target.options].some(option => option.value === item.recordId)) {
+      target.value = item.recordId;
+      target.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+
+  function prefillUpdateForItem(item) {
+    if (!item) return;
+    setFormValue("update-type", "sop");
+    setFormValue("update-submission-type", "Update Existing SOP");
+    syncUpdateType();
+    chooseWorkflowForItem(item);
+    fillUpdateFields(item);
+    document.getElementById("update-reason")?.focus({ preventScroll: true });
+  }
+
   function bindWorkflowSelector(prefix) {
     const category = document.getElementById(`${prefix}-category`);
-    const group = document.getElementById(`${prefix}-group`);
     const target = document.getElementById(`${prefix}-target`);
     const path = document.getElementById(`${prefix}-path`);
     const preview = document.getElementById(`${prefix}-current-preview`);
-    if (!category || !group || !target || !path || !preview) return;
+    if (!category || !target || !path || !preview) return;
 
-    category.innerHTML = optionList(categoryChoices(), "Select a request type or section");
-    group.innerHTML = `<option value="">Select a request type first</option>`;
-    target.innerHTML = `<option value="">Select a request type first</option>`;
+    category.innerHTML = optionList(categoryChoices(), "Select a left navigation category");
+    target.innerHTML = `<option value="">Select a category first</option>`;
 
     function updatePath() {
-      const values = [selectedText(category), selectedText(group), selectedText(target)]
+      const values = [selectedText(category), selectedText(target)]
         .filter(value => value && !/^Select|^No additional/.test(value));
       path.innerHTML = values.length ? values.map(value => `<span>${escape(value)}</span>`).join("") : `<span>No workflow selected</span>`;
       const item = window.baseModel?.items.find(candidate => candidate.recordId === target.value);
@@ -267,36 +314,16 @@
     }
 
     category.addEventListener("change", () => {
-      const groups = groupChoices(category.value);
-      group.disabled = !category.value || !groups.length;
-      group.innerHTML = groups.length
-        ? optionList(groups, "All workflows in this section")
-        : `<option value="">No additional workflow level</option>`;
-      const targets = category.value && !groups.length ? targetChoices(category.value, "") : [];
+      const targets = category.value ? targetChoices(category.value, "") : [];
       target.disabled = !targets.length;
-      target.innerHTML = groups.length
-        ? `<option value="">Select a workflow family first</option>`
-        : optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
-      preview.innerHTML = "";
-      updatePath();
-    });
-
-    group.addEventListener("change", () => {
-      const targets = group.value ? targetChoices(category.value, group.value) : [];
-      target.disabled = !targets.length;
-      target.innerHTML = group.value
-        ? optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance")
-        : `<option value="">Select a workflow family first</option>`;
+      target.innerHTML = optionList(targets.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
       preview.innerHTML = "";
       updatePath();
     });
 
     target.addEventListener("change", () => {
       updatePath();
-      if (prefix === "update-workflow" && target.value) {
-        const title = document.getElementById("update-title");
-        if (title && !title.value.trim()) title.value = selectedText(target);
-      }
+      if (prefix === "update-workflow" && target.value) maybeFillSelectedUpdate();
     });
   }
 
@@ -384,7 +411,7 @@
   }
 
   function workflowPath(prefix) {
-    return [`${prefix}-category`, `${prefix}-group`, `${prefix}-target`]
+    return [`${prefix}-category`, `${prefix}-target`]
       .map(id => selectedText(document.getElementById(id)))
       .filter(value => value && !/^Select|^No additional/.test(value))
       .join(" > ");
@@ -392,16 +419,12 @@
 
   function workflowSelection(prefix) {
     const category = document.getElementById(`${prefix}-category`)?.value || "";
-    const group = document.getElementById(`${prefix}-group`)?.value || "";
     const targetRecordId = document.getElementById(`${prefix}-target`)?.value || "";
-    const groupRecord = (window.baseModel?.items || []).find(item =>
-      item.displayType === "Process Group" && key(item.title) === key(group)
-    );
     return {
       path: workflowPath(prefix),
       category,
-      group,
-      groupRecordId: groupRecord?.recordId || "",
+      group: "",
+      groupRecordId: "",
       targetRecordId
     };
   }
@@ -612,7 +635,14 @@
     document.getElementById("update-submission-form")?.addEventListener("submit", submitUpdate);
     document.getElementById("related-suggestion-form")?.addEventListener("submit", submitRelatedSuggestion);
     document.getElementById("update-type")?.addEventListener("change", syncUpdateType);
-    document.getElementById("update-submission-type")?.addEventListener("change", syncScreenshotOptions);
+    document.getElementById("update-submission-type")?.addEventListener("change", () => {
+      syncScreenshotOptions();
+      if (document.getElementById("update-submission-type")?.value === "Replace Existing SOP") {
+        clearProposedUpdateFields();
+      } else {
+        maybeFillSelectedUpdate();
+      }
+    });
     document.getElementById("related-kind")?.addEventListener("change", syncRelatedKind);
     window.BOTSOP_REVIEWS?.bindPage?.();
     syncUpdateType();
@@ -659,12 +689,28 @@
     `;
     bindPage();
     activateTab(state.activeTab);
+    if (state.updateTargetId) {
+      const item = window.baseModel?.find(state.updateTargetId);
+      state.updateTargetId = "";
+      if (item) {
+        activateTab("update");
+        prefillUpdateForItem(item);
+      }
+    }
   }
 
   window.BOTSOP_SUBMISSIONS = {
     loadAccess,
     hasAnyAccess,
+    canSubmitUpdates,
     showSubmissionCenter
+  };
+
+  window.openUpdateSubmission = function openUpdateSubmission(itemId) {
+    const item = window.baseModel?.find(itemId);
+    if (!item?.recordId || !canSubmitUpdates()) return;
+    state.updateTargetId = item.id;
+    showSubmissionCenter();
   };
 
   window.openRelatedSuggestion = function openRelatedSuggestion(itemId) {

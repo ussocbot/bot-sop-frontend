@@ -217,7 +217,7 @@ module.exports = async function handler(req, res) {
       }
 
       const submissionType = text(body.submissionType, 100);
-      const allowedTypes = new Set(["New SOP", "Update Existing SOP", "Correction"]);
+      const allowedTypes = new Set(["New SOP", "Update Existing SOP", "Replace Existing SOP", "Correction"]);
       if (updateType === "SOP Update" && !allowedTypes.has(submissionType)) {
         return res.status(400).json({ error: "Select a valid submission type." });
       }

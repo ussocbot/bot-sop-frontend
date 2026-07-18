@@ -4,99 +4,25 @@ window.navigationItems = [];
   "use strict";
 
   const DISPLAY_TYPES = {
-    "request type": "Request Type",
-    "process group": "Process Group",
-    process: "Process",
-    section: "Section",
-    checklist: "Checklist",
-    "checklist step": "Checklist Step",
-    callout: "Callout",
-    tool: "Tool",
-    link: "Link",
-    news: "News",
-    "sop update": "SOP Update",
-    "macro update": "Macro Update",
-    warning: "Warning"
-  };
-
-  const BASE_SECTIONS = {
-    "request types": "Request Types",
-    "process content": "Process Content",
-    "bot expectations": "BOT Expectations",
+    "left nav": "Left Nav",
+    content: "Content",
     "usds jv compliance": "USDS JV Compliance",
-    "best practices": "Best Practices",
-    "wrap up": "Wrap Up",
-    "ticket guidance": "Ticket Guidance",
-    "ban operators and reasons": "Ban Operators and Reasons",
-    "oos routing": "OOS Routing",
+    "bot expectations": "BOT Expectations",
+    "out of scope": "Out of Scope",
+    "ban operators": "Ban Operators",
+    "ban operators and reasons": "Ban Operators",
+    "oos quick nav": "OOS Quick Nav",
     "bot tools": "BOT Tools",
+    "bot links": "BOT Links",
     "opus links": "OPUS Links",
     "qa links": "QA Links",
     "important news": "Important News",
     "sop updates": "SOP Updates",
     "macro updates": "Macro Updates",
-    "policy reminders": "Policy Reminders"
+    warning: "Warning"
   };
 
-  const REQUEST_TYPE_ORDER = [
-    "Video / Photo Post",
-    "Account",
-    "Age Appeals",
-    "Live",
-    "Comment",
-    "Direct Message",
-    "Live Comment",
-    "User Profile",
-    "Circumvention / Recidivism",
-    "Response Wrap-Up",
-    "OOS Routing",
-    "Audio",
-    "E-Commerce"
-  ];
-
-  const REQUEST_TYPE_ALIASES = {
-    "video/photo post": "Video / Photo Post",
-    "video / photo post": "Video / Photo Post",
-    account: "Account",
-    "age appeals": "Age Appeals",
-    "age appeal": "Age Appeals",
-    live: "Live",
-    comment: "Comment",
-    "direct message": "Direct Message",
-    dm: "Direct Message",
-    "live comment": "Live Comment",
-    "user profile": "User Profile",
-    "circumvention/recidivism": "Circumvention / Recidivism",
-    "circumvention / recidivism": "Circumvention / Recidivism",
-    "response wrap-up": "Response Wrap-Up",
-    "response wrap up": "Response Wrap-Up",
-    "oos routing": "OOS Routing",
-    audio: "Audio",
-    ecommerce: "E-Commerce",
-    "e-commerce": "E-Commerce"
-  };
-
-  const SECTION_CONTRACT = {
-    "Request Type|Request Types": "left request navigation",
-    "Process Group|Process Content": "center submenu",
-    "Process|Process Content": "center process content",
-    "Section|BOT Expectations": "BOT Expectations homepage section",
-    "Section|USDS JV Compliance": "USDS JV Compliance homepage section",
-    "Section|Best Practices": "Best Practices homepage section",
-    "Checklist|Wrap Up": "Wrap Up homepage section",
-    "Checklist Step|Wrap Up": "nested Wrap Up step",
-    "Checklist|Ticket Guidance": "Ticket Guidance homepage section",
-    "Checklist Step|Ticket Guidance": "nested Ticket Guidance step",
-    "Section|Ban Operators and Reasons": "Ban Operators and Reasons homepage section",
-    "Callout|OOS Routing": "left OOS Routing card",
-    "Tool|BOT Tools": "right BOT Tools card",
-    "Link|OPUS Links": "right OPUS Links card",
-    "Link|QA Links": "right QA Links card",
-    "News|Important News": "right Important News card",
-    "SOP Update|SOP Updates": "right SOP Updates card",
-    "Macro Update|Macro Updates": "right Macro Updates card",
-    "Warning|Policy Reminders": "bottom-wide policy reminder"
-  };
+  const VALID_DISPLAY_TYPES = new Set(Object.values(DISPLAY_TYPES));
 
   function normalizeKey(value) {
     return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -288,13 +214,7 @@ window.navigationItems = [];
   }
 
   function canonicalRequestType(value) {
-    const supplied = textValue(value).replace(/\s+/g, " ");
-    return REQUEST_TYPE_ALIASES[normalizeKey(supplied)] || supplied;
-  }
-
-  function requestTypeOrder(title) {
-    const index = REQUEST_TYPE_ORDER.indexOf(title);
-    return index === -1 ? 1000 : index + 1;
+    return textValue(value).replace(/\s+/g, " ");
   }
 
   function stableHash(value) {
@@ -306,21 +226,23 @@ window.navigationItems = [];
   function getIcon(record) {
     if (record.iconKey) return record.iconKey;
     const pools = {
-      "Request Type": ["folder", "layers", "inbox", "layout-grid"],
-      "Process Group": ["folders", "library", "layers", "blocks"],
-      Process: ["file-text", "clipboard-list", "book-open", "scroll-text", "lightbulb"],
-      Section: ["info", "book-open", "lightbulb", "circle-help", "compass"],
-      Checklist: ["circle-check-big", "list-checks", "clipboard-check", "badge-check"],
-      "Checklist Step": ["list-checks", "check-check", "clipboard-check", "circle-check"],
-      Callout: ["route", "signpost", "compass", "flag", "shield-alert"],
-      Tool: ["wrench", "settings", "hammer", "badge-help"],
-      Link: ["link", "external-link", "bookmark", "book-marked"],
-      News: ["megaphone", "newspaper", "bell", "radio"],
-      "SOP Update": ["file-clock", "refresh-cw", "history", "calendar-clock"],
-      "Macro Update": ["message-square-more", "messages-square", "notebook-tabs", "text-quote"],
+      "Left Nav": ["folder", "layers", "inbox", "layout-grid"],
+      Content: ["file-text", "clipboard-list", "book-open", "scroll-text", "lightbulb"],
+      "USDS JV Compliance": ["shield-check", "badge-check", "landmark", "scale"],
+      "BOT Expectations": ["clock-3", "circle-check-big", "clipboard-check", "badge-check"],
+      "Out of Scope": ["route", "signpost", "compass", "flag"],
+      "Ban Operators": ["shield-check", "ban", "badge-alert", "list-checks"],
+      "OOS Quick Nav": ["route", "signpost", "compass", "flag", "shield-alert"],
+      "BOT Tools": ["wrench", "settings", "hammer", "badge-help"],
+      "BOT Links": ["link", "external-link", "bookmark", "book-marked"],
+      "OPUS Links": ["link", "external-link", "bookmark", "book-marked"],
+      "QA Links": ["badge-check", "link", "external-link", "bookmark"],
+      "Important News": ["megaphone", "newspaper", "bell", "radio"],
+      "SOP Updates": ["file-clock", "refresh-cw", "history", "calendar-clock"],
+      "Macro Updates": ["message-square-more", "messages-square", "notebook-tabs", "text-quote"],
       Warning: ["shield-alert", "triangle-alert", "badge-alert", "circle-alert"]
     };
-    const choices = pools[record.displayType] || pools.Process;
+    const choices = pools[record.displayType] || pools.Content;
     return choices[stableHash(record.recordId || record.recordKey || record.title) % choices.length];
   }
 
@@ -336,11 +258,6 @@ window.navigationItems = [];
     const displayType = canonical(
       findField(fields, ["Display Type"]),
       DISPLAY_TYPES,
-      ""
-    );
-    const baseSection = canonical(
-      findField(fields, ["Base Section"]),
-      BASE_SECTIONS,
       ""
     );
     const rawScreenshotGuidance = findField(fields, ["Screenshot Guidance"]);
@@ -365,13 +282,13 @@ window.navigationItems = [];
       recordKey,
       title,
       displayType,
-      baseSection,
+      baseSection: "",
       iconKey: textValue(findField(fields, ["Icon Key", "Icon"])),
       summary: textValue(findField(fields, ["Content Summary", "Summary", "Description"])),
       instruction,
       appearsIn: listValue(findField(fields, ["Appears In"])).map(canonicalRequestType),
-      parents: relationNames(findField(fields, ["Parent"])),
-      parentIds: relationIds(findField(fields, ["Parent"])),
+      parents: [],
+      parentIds: [],
       sortOrder: numberValue(findField(fields, ["Sort Order"]), index + 1),
       priority: numberValue(findField(fields, ["Priority"]), 0),
       quickAccess: boolValue(findField(fields, ["Quick Access", "Quick Access OOS"]), false),
@@ -405,9 +322,8 @@ window.navigationItems = [];
 
     item.description = item.summary;
     item.icon = getIcon(item);
-    item.contractKey = `${item.displayType}|${item.baseSection}`;
-    item.destination = SECTION_CONTRACT[item.contractKey] || "Unmapped";
-    item.mappingValid = Boolean(SECTION_CONTRACT[item.contractKey]);
+    item.destination = item.displayType || "Unmapped";
+    item.mappingValid = VALID_DISPLAY_TYPES.has(item.displayType);
     item.resourceCount = item.relatedResourceIds.length || item.unresolvedRelatedResources.length;
     return item;
   }
@@ -447,7 +363,7 @@ window.navigationItems = [];
       ticketTags: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
       keywords: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
       category: textValue(findField(fields, ["Category", "Content Type", "Topic"])),
-      displayType: "Link",
+      displayType: "Resource",
       sourceType: "Documentation",
       sopRecordIds: relationIds(findField(fields, ["SOP"])),
       screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
@@ -460,48 +376,10 @@ window.navigationItems = [];
     return item;
   }
 
-  function buildRequestTypes(items, allItems = items) {
-    const explicit = items.filter(item => item.displayType === "Request Type");
-    const inactiveExplicitTitles = new Set(
-      allItems
-        .filter(item => item.displayType === "Request Type")
-        .filter(item => !item.published || normalizeKey(item.status) !== "active")
-        .map(item => normalizeKey(item.title))
-    );
-    const contexts = new Set();
-    items
-      .filter(item => ["Process", "Process Group"].includes(item.displayType))
-      .forEach(item => item.appearsIn.forEach(context => {
-        if (context && !["global", "oos routing"].includes(normalizeKey(context)) && !inactiveExplicitTitles.has(normalizeKey(context))) contexts.add(context);
-      }));
-    explicit.forEach(item => {
-      if (normalizeKey(item.title) !== "oos routing") contexts.add(item.title);
-    });
-
-    return [...contexts].map((title, index) => {
-      const configured = explicit.find(item => normalizeKey(item.title) === normalizeKey(title));
-      return configured || {
-        id: `request-${slugify(title)}`,
-        recordKey: `request-${slugify(title)}`,
-        title,
-        displayType: "Request Type",
-        baseSection: "Request Types",
-        icon: "folder",
-        description: `${title} processes and guidance.`,
-        summary: `${title} processes and guidance.`,
-        appearsIn: [title],
-        parents: [],
-        sortOrder: requestTypeOrder(title) || index + 1,
-        status: "Active",
-        published: true,
-        synthetic: true,
-        mappingValid: true,
-        destination: "left request navigation"
-      };
-    }).sort((a, b) =>
-      (a.sortOrder || requestTypeOrder(a.title)) - (b.sortOrder || requestTypeOrder(b.title)) ||
-      a.title.localeCompare(b.title)
-    );
+  function buildRequestTypes(items) {
+    return items
+      .filter(item => item.displayType === "Left Nav")
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
   }
 
   function buildModel(records, documentationRecords = []) {
@@ -534,16 +412,24 @@ window.navigationItems = [];
       });
       item.resourceCount = item.relatedResources.length;
     });
-    const requestTypes = buildRequestTypes(publishedItems, items);
+    const requestTypes = buildRequestTypes(publishedItems);
+    publishedItems.forEach(item => {
+      item.mappingIssue = "";
+      if (!item.mappingValid) {
+        item.mappingIssue = item.displayType
+          ? `Unknown Display Type: ${item.displayType}`
+          : "Display Type is blank";
+      }
+    });
 
     return {
       items: publishedItems,
       documents,
       requestTypes,
-      unmapped: publishedItems.filter(item => !item.mappingValid),
-      section(displayType, baseSection) {
+      unmapped: publishedItems.filter(item => item.mappingIssue),
+      section(displayType) {
         return publishedItems
-          .filter(item => item.displayType === displayType && item.baseSection === baseSection)
+          .filter(item => item.displayType === displayType)
           .sort((a, b) => b.priority - a.priority || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
       },
       documentsFor(placement) {
@@ -577,18 +463,8 @@ window.navigationItems = [];
       processesFor(requestType) {
         return publishedItems
           .filter(item =>
-            ["Process", "Process Group"].includes(item.displayType) &&
-            item.baseSection === "Process Content" &&
+            item.displayType === "Content" &&
             item.appearsIn.some(context => normalizeKey(context) === normalizeKey(requestType))
-          )
-          .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
-      },
-      wrapStepsFor(parent) {
-        return publishedItems
-          .filter(item => item.displayType === "Checklist Step" && ["Wrap Up", "Ticket Guidance"].includes(item.baseSection))
-          .filter(item =>
-            item.parentIds.includes(parent.recordId) ||
-            item.parents.some(value => normalizeKey(value) === normalizeKey(parent.title))
           )
           .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
       },
@@ -602,7 +478,7 @@ window.navigationItems = [];
         const now = Date.now();
 
         return [...publishedItems, ...documents]
-          .filter(item => item.displayType !== "Request Type")
+          .filter(item => item.displayType !== "Left Nav")
           .filter(item => source === "all" || (source === "resource") === (item.sourceType === "Documentation"))
           .filter(item => contentType === "all" || normalizeKey(item.displayType) === contentType || normalizeKey(item.category) === contentType)
           .filter(item => requestType === "all" || (item.appearsIn || []).some(value => normalizeKey(value) === requestType))
@@ -643,8 +519,7 @@ window.navigationItems = [];
 
   window.BOTSOP = {
     DISPLAY_TYPES,
-    BASE_SECTIONS,
-    SECTION_CONTRACT,
+    VALID_DISPLAY_TYPES,
     mapRecord,
     mapDocumentationRecord,
     buildModel,
@@ -657,7 +532,7 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v15";
+  const DATA_CACHE_KEY = "botsop:base-data:v18";
   const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {

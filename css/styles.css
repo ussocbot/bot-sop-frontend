@@ -224,6 +224,9 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .send-to-me-button:disabled { cursor: wait; opacity: .7; }
 .send-to-me-button.is-sent { border-color: #8ac89b; color: #166534; background: #effaf2; }
 .send-to-me-button.is-error { border-color: #e8a0a0; color: #991b1b; background: #fff1f2; }
+.update-entry-button { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 8px 11px; border: 1px solid #b7b8df; border-radius: 9px; color: #4338a8; background: #f3f1ff; font-size: 11px; font-weight: 700; cursor: pointer; }
+.update-entry-button:hover { border-color: #8b88cf; background: #e9e7ff; }
+.update-entry-button--meta { padding: 6px 10px; border-radius: 999px; }
 .detail-section { overflow: hidden; border: 1px solid #cbd8e8; border-radius: 12px; background: #fff; box-shadow: 0 3px 10px rgba(33, 66, 110, .04); }
 .detail-section h2 { display: flex; align-items: center; gap: 9px; margin: 0; padding: 14px 16px; border-bottom: 1px solid #cbd8e8; border-left: 4px solid #4f86cf; color: #173b6c; background: linear-gradient(90deg, #eaf3ff, #f6f9fd); font-size: 15px; font-weight: 800; }
 .detail-section h2 svg { width: 18px; height: 18px; }
@@ -286,9 +289,6 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .image-viewer__controls { display: flex; align-items: center; gap: 6px; }
 .image-viewer__controls a { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: var(--ink); background: #eef2f7; }
 
-.header-refresh-button { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 8px 11px; border: 1px solid rgba(255,255,255,.24); border-radius: 9px; color: #fff; background: rgba(255,255,255,.08); cursor: pointer; }
-.header-refresh-button:hover { background: rgba(255,255,255,.16); }
-.header-refresh-button svg { width: 15px; height: 15px; }
 .special-request-icon { width: 13px; height: 13px; color: #ffd45a; fill: rgba(255,212,90,.22); vertical-align: -2px; }
 .entry-new-badge { display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 7px; border: 1px solid #efb4ba; border-radius: 999px; color: #a12633; background: #fff1f2; font-size: 9px; font-style: normal; font-weight: 800; line-height: 1.2; text-transform: uppercase; vertical-align: 1px; }
 .entry-new-badge--header { font-size: 10px; vertical-align: middle; }
@@ -507,3 +507,86 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
   .review-queue__items { max-height: 320px; }
   .submission-panel { padding: 16px; }
 }
+
+/* V17 unified content typography */
+.content .detail-section__body,
+.content .expectation-item__body,
+.content .current-guidance-preview,
+.submission-editor__preview,
+.review-current-card,
+#review-proposed-guidance {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.content .detail-section__body p,
+.content .expectation-item__body p,
+.submission-editor__preview p,
+.review-current-card p,
+#review-proposed-guidance p {
+  margin: 0 0 10px;
+  font-size: inherit;
+  line-height: inherit;
+}
+.content .detail-section__body li,
+.content .expectation-item__body li,
+.submission-editor__preview li,
+.review-current-card li,
+#review-proposed-guidance li {
+  margin: 4px 0;
+  font-size: inherit;
+  line-height: inherit;
+}
+.content .formatted-content h3,
+.content .expectation-item__body h3,
+.submission-editor__preview h3,
+.review-current-card h3,
+#review-proposed-guidance h3 {
+  margin: 18px 0 8px;
+  font-size: 17px;
+  line-height: 1.3;
+}
+.content .formatted-content h4,
+.content .expectation-item__body h4,
+.submission-editor__preview h4,
+.review-current-card h4,
+#review-proposed-guidance h4 {
+  margin: 16px 0 7px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.content .formatted-content h5,
+.content .expectation-item__body h5,
+.submission-editor__preview h5,
+.review-current-card h5,
+#review-proposed-guidance h5 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  line-height: 1.4;
+}
+.content .formatted-content ul,
+.content .formatted-content ol,
+.content .expectation-item__body ul,
+.content .expectation-item__body ol,
+.submission-editor__preview ul,
+.submission-editor__preview ol,
+.review-current-card ul,
+.review-current-card ol,
+#review-proposed-guidance ul,
+#review-proposed-guidance ol {
+  margin: 8px 0 12px;
+  padding-left: 24px;
+}
+
+/* V17 compact related resources */
+.detail-section--related h2 { padding: 10px 12px; font-size: 13px; }
+.detail-section--related h2 svg { width: 16px; height: 16px; }
+.detail-section--related .suggest-related-button { gap: 6px; margin: 6px 7px 0; padding: 6px 9px; font-size: 11px; }
+.detail-section--related .suggest-related-button svg { width: 14px; height: 14px; }
+.detail-section--related .detail-link-list { padding: 6px; }
+.detail-section--related .detail-link-row { margin-bottom: 4px; border-radius: 7px; }
+.content .detail-section--related .detail-link-main { gap: 7px; padding: 8px 10px; font-size: 13px; line-height: 1.35; }
+.detail-section--related .detail-link-main > span { gap: 7px; }
+.detail-section--related .detail-link-main svg { width: 15px; height: 15px; }
+.detail-section--related .copy-link-button { min-width: 36px; padding: 0 8px; }
+.detail-section--related .copy-link-button svg { width: 14px; height: 14px; }

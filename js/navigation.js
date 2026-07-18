@@ -6,21 +6,16 @@
     const model = window.baseModel;
     if (!nav || !model) return;
 
-    const callouts = model.section("Callout", "OOS Routing");
+    const callouts = model.section("OOS Quick Nav");
     const oosRoutes = model.documentsFor("OOS Routing");
     const allOosRoutes = [...new Map([...callouts, ...oosRoutes].map(item => [item.id, item])).values()]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
     const markedQuickAccess = allOosRoutes.filter(item => item.quickAccess);
     const quickAccessRoutes = (markedQuickAccess.length ? markedQuickAccess : allOosRoutes).slice(0, 6);
-    const hiddenRequestTypes = new Set([
-      "e-commerce", "ecommerce", "best practices", "circumvention / recidivism",
-      "circumvention/recidivism", "remarks / closing", "remarks/closing",
-      "response wrap-up", "response wrap up", "wrap up", "ticket guidance", "oos routing"
-    ]);
-    const visibleRequestTypes = model.requestTypes.filter(item => !hiddenRequestTypes.has(item.title.trim().toLowerCase()));
+    const visibleRequestTypes = model.requestTypes;
     nav.innerHTML = `
       <div class="nav-block">
-        <p class="nav-label">Request Types</p>
+        <p class="nav-label">Guidance</p>
         ${visibleRequestTypes.map(item => `
           <button type="button" class="nav-item" data-section-id="${window.BOTSOP_UI.escape(item.id)}" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
             ${window.BOTSOP_UI.icon(item.icon || "folder")}

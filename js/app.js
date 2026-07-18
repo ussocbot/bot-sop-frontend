@@ -59,22 +59,14 @@ window.appState = {
     return (item.appearsIn || []).some(value => placementKey(value) === wanted);
   }
 
-  function guidanceItemsFor(placement) {
-    const supportedTypes = new Set(["Process", "Section", "Checklist", "Checklist Step"]);
-    const wanted = placementKey(placement);
+  function guidanceItemsFor(displayType) {
     return (window.baseModel?.items || [])
-      .filter(item => supportedTypes.has(item.displayType))
-      .filter(item => placementKey(item.baseSection) === wanted || appearsIn(item, placement))
+      .filter(item => item.displayType === displayType)
       .sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
   }
 
   function uniqueItems(items) {
     return [...new Map((items || []).map(item => [item.id, item])).values()];
-  }
-
-  function guidanceItemsForAny(placements) {
-    return uniqueItems(placements.flatMap(guidanceItemsFor))
-      .sort((a, b) => (b.priority || 0) - (a.priority || 0) || a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
   }
 
   function processAccordionList(items) {
@@ -99,19 +91,29 @@ window.appState = {
   }
 
   function favoriteButton(item, compact = false) {
-    if (!window.baseMeta?.favoritesEnabled || !item.recordId || item.displayType === "Request Type") return "";
+    if (!window.baseMeta?.favoritesEnabled || !item.recordId || item.displayType === "Left Nav") return "";
     const active = window.appState.favorites.has(favoriteKey(item));
     const pending = window.appState.favoritePending.has(favoriteKey(item));
     return `<button type="button" data-favorite-id="${window.BOTSOP_UI.escape(item.id)}" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')"${pending ? " disabled" : ""}>${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")} ${pending ? "Saving..." : (active ? "Remove from Favorites" : "Add to Favorites")}</button>`;
   }
 
   function sendToMeButton(item) {
-    if (!window.baseMeta?.sendToMeEnabled || !item.recordId || item.displayType === "Request Type") return "";
+    if (!window.baseMeta?.sendToMeEnabled || !item.recordId || item.displayType === "Left Nav") return "";
     return `<button type="button" class="send-to-me-button" onclick="sendToMe('${window.BOTSOP_UI.escape(item.id)}', this)">${window.BOTSOP_UI.icon("send")} Send to Me</button>`;
   }
 
+  function updateEntryButton(item, compact = false) {
+    if (
+      !window.BOTSOP_SUBMISSIONS?.canSubmitUpdates?.() ||
+      !item.recordId ||
+      item.sourceType === "Documentation" ||
+      item.displayType === "Left Nav"
+    ) return "";
+    return `<button type="button" class="update-entry-button${compact ? " update-entry-button--meta" : ""}" onclick="openUpdateSubmission('${window.BOTSOP_UI.escape(item.id)}')">${window.BOTSOP_UI.icon("square-pen")} Update this SOP</button>`;
+  }
+
   function entryActionButtons(item) {
-    const actions = [favoriteButton(item), sendToMeButton(item)].filter(Boolean).join("");
+    const actions = [favoriteButton(item), sendToMeButton(item), updateEntryButton(item)].filter(Boolean).join("");
     return actions ? `<div class="inline-entry-actions">${actions}</div>` : "";
   }
 
@@ -132,13 +134,9 @@ window.appState = {
 
     const expectations = guidanceItemsFor("BOT Expectations");
     const usdsCompliance = guidanceItemsFor("USDS JV Compliance");
-    const outOfScope = uniqueItems([
-      ...model.section("Callout", "OOS Routing"),
-      ...model.documentsFor("OOS Routing")
-    ]);
-    const ticketGuidance = guidanceItemsForAny(["Ticket Guidance", "Wrap Up"]);
-    const banOperatorsAndReasons = guidanceItemsForAny(["Ban Operators and Reasons", "Ban Operators", "Reasons"]);
-    const warnings = model.section("Warning", "Policy Reminders");
+    const outOfScope = guidanceItemsFor("Out of Scope");
+    const banOperatorsAndReasons = guidanceItemsFor("Ban Operators");
+    const warnings = model.section("Warning");
 
     renderAndRefresh(`
       <div class="page-stack">
@@ -147,7 +145,6 @@ window.appState = {
         ${window.BOTSOP_UI.guidanceDropdownSection("USDS JV Compliance", "shield-check", usdsCompliance, "red", "Privacy, disclosure, and USDS JV handling requirements.")}
         ${window.BOTSOP_UI.expectationsSection(expectations, "Required standards and responsibilities for every ticket.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Out of Scope", "route", outOfScope, "blue", "Routing guidance for work that falls outside BOT scope.")}
-        ${window.BOTSOP_UI.guidanceDropdownSection("Ticket Guidance", "circle-check-big", ticketGuidance, "violet", "Steps and reminders for handling and closing tickets.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Ban Operators and Reasons", "shield-check", banOperatorsAndReasons, "orange", "Guidance for selecting ban operators and reason codes.")}
         ${window.BOTSOP_UI.warningCards(warnings)}
       </div>
@@ -164,7 +161,7 @@ window.appState = {
     }
     window.setActiveNavigation(null);
     const items = uniqueItems([
-      ...model.section("Callout", "OOS Routing"),
+      ...model.section("OOS Quick Nav"),
       ...model.documentsFor("OOS Routing")
     ]).sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
     renderAndRefresh(`
@@ -181,9 +178,9 @@ window.appState = {
     const model = window.baseModel;
     if (!model) return;
     const config = {
-      "important-news": { title: "Important News", icon: "megaphone", items: [...model.featuredFor("Important News"), ...model.section("News", "Important News")] },
-      "sop-updates": { title: "SOP Updates", icon: "file-clock", items: [...model.featuredFor("SOP Updates"), ...model.section("SOP Update", "SOP Updates")] },
-      "macro-updates": { title: "Macro Updates", icon: "message-square-more", items: model.section("Macro Update", "Macro Updates") }
+      "important-news": { title: "Important News", icon: "megaphone", items: [...model.featuredFor("Important News"), ...model.section("Important News")] },
+      "sop-updates": { title: "SOP Updates", icon: "file-clock", items: [...model.featuredFor("SOP Updates"), ...model.section("SOP Updates")] },
+      "macro-updates": { title: "Macro Updates", icon: "message-square-more", items: model.section("Macro Updates") }
     }[type];
     if (!config) return;
     if (addToHistory) remember("updates", type);
@@ -218,57 +215,19 @@ window.appState = {
     if (addToHistory) remember("section", requestType.id);
     window.setActiveNavigation(requestType.id);
 
-    const supportedTypes = new Set(["Process", "Process Group", "Section", "Checklist", "Checklist Step"]);
     const allItems = model.items
-      .filter(item => supportedTypes.has(item.displayType) && appearsIn(item, requestType.title))
+      .filter(item => item.displayType === "Content" && appearsIn(item, requestType.title))
       .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
-    const groups = allItems.filter(item => item.displayType === "Process Group");
-    const processes = allItems.filter(item => item.displayType !== "Process Group");
-    const groupedNames = new Set(groups.map(group => group.title.toLowerCase()));
-    const ungrouped = processes.filter(item =>
-      !item.parents.some(parent => groupedNames.has(parent.toLowerCase()))
-    );
-
-    const groupSections = groups.map(group => {
-      const children = processes.filter(item =>
-        item.parents.some(parent => parent.toLowerCase() === group.title.toLowerCase())
-      );
-      return `
-        <section class="process-group">
-          <header><span>${window.BOTSOP_UI.icon(group.icon || "folders")}</span><div><h2>${window.BOTSOP_UI.escape(group.title)}</h2><p>${window.BOTSOP_UI.escape(group.summary || group.description || "Related processes")}</p></div></header>
-          ${processAccordionList(children)}
-        </section>
-      `;
-    }).join("");
 
     renderAndRefresh(`
       <div class="page-stack">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(requestType.title)}</span></nav>
         <header class="process-header">
           <span class="process-header__icon">${window.BOTSOP_UI.icon(requestType.icon || "folder")}</span>
-          <div><p>Request Type</p><h1>${window.BOTSOP_UI.escape(requestType.title)}</h1><span>${window.BOTSOP_UI.escape(requestType.summary || requestType.description || "Operational guidance and workflows")}</span></div>
+          <div><p>Guidance Category</p><h1>${window.BOTSOP_UI.escape(requestType.title)}</h1><span>${window.BOTSOP_UI.escape(requestType.summary || requestType.description || "Operational guidance and workflows")}</span></div>
         </header>
-        ${ungrouped.length ? `<section class="process-group"><header><div><h2>${window.BOTSOP_UI.escape(requestType.title)} Processes</h2><p>Expand a process to view its complete guidance.</p></div></header>${processAccordionList(ungrouped)}</section>` : ""}
-        ${groupSections}
-        ${!processes.length ? `<section class="empty-state"><h2>No processes mapped here</h2><p>Add this request type to a Process record's <strong>Appears In</strong> field.</p></section>` : ""}
-      </div>
-    `);
-  };
-
-  window.showWrapUp = function showWrapUp(recordId, addToHistory = true) {
-    const model = window.baseModel;
-    const parent = model?.find(recordId);
-    if (!model || !parent) return;
-    const steps = model.wrapStepsFor(parent);
-    if (addToHistory) remember("wrap", parent.id);
-    window.setActiveNavigation(null);
-    renderAndRefresh(`
-      <div class="page-stack">
-        <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(parent.title)}</span></nav>
-        <header class="process-header"><span class="process-header__icon">${window.BOTSOP_UI.icon(parent.icon || "circle-check-big")}</span><div><p>Ticket Guidance</p><h1>${window.BOTSOP_UI.escape(parent.title)}</h1><span>${window.BOTSOP_UI.escape(parent.summary || "Complete each step before closing the ticket.")}</span></div></header>
-        ${parent.instruction ? window.BOTSOP_UI.markdownSection("Guidance", "clipboard-check", parent.instruction) : ""}
-        <section class="process-group"><header><div><h2>Ticket Guidance Steps</h2><p>Select a step to view its full guidance.</p></div></header><div class="process-grid">${steps.map(window.BOTSOP_UI.processCard).join("")}</div></section>
-        ${!steps.length ? `<section class="empty-state"><h2>No steps mapped yet</h2><p>Add Checklist Step records with <strong>${window.BOTSOP_UI.escape(parent.title)}</strong> in Parent.</p></section>` : ""}
+        ${allItems.length ? `<section class="process-group"><header><div><h2>${window.BOTSOP_UI.escape(requestType.title)} Guidance</h2><p>Expand an entry to view its complete guidance.</p></div></header>${processAccordionList(allItems)}</section>` : ""}
+        ${!allItems.length ? `<section class="empty-state"><h2>No content mapped here</h2><p>Add <strong>${window.BOTSOP_UI.escape(requestType.title)}</strong> to a Content record's <strong>Appears In</strong> field.</p></section>` : ""}
       </div>
     `);
   };
@@ -277,9 +236,8 @@ window.appState = {
     const model = window.baseModel;
     const item = model?.find(recordId);
     if (!model || !item) return;
-    if (item.displayType === "Request Type") return window.showSection(item.id, addToHistory);
-    if (item.displayType === "Checklist" && model.wrapStepsFor(item).length) return window.showWrapUp(item.id, addToHistory);
-    if (["Link", "Tool"].includes(item.displayType) && item.sourceType !== "Documentation") {
+    if (item.displayType === "Left Nav") return window.showSection(item.id, addToHistory);
+    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType) && item.sourceType !== "Documentation") {
       if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
       return;
     }
@@ -287,11 +245,6 @@ window.appState = {
 
     const context = item.appearsIn[0];
     const requestType = context && model.requestTypes.find(candidate => candidate.title === context);
-    const wrapParent = item.displayType === "Checklist Step"
-      ? model.items.find(candidate => candidate.displayType === "Checklist" && (
-          item.parentIds?.includes(candidate.recordId) || item.parents?.some(parent => parent.toLowerCase() === candidate.title.toLowerCase())
-        ))
-      : null;
     window.setActiveNavigation(requestType?.id || null);
 
     const badge = window.BOTSOP_UI.itemBadge(item);
@@ -300,20 +253,20 @@ window.appState = {
       item.lastUpdated && `<span>${window.BOTSOP_UI.icon("calendar-clock")} Updated ${window.BOTSOP_UI.escape(item.lastUpdated)}</span>`,
       item.displayType && `<span>${window.BOTSOP_UI.icon("layout-template")} ${window.BOTSOP_UI.escape(item.displayType)}</span>`,
       favoriteButton(item, true),
-      sendToMeButton(item)
+      sendToMeButton(item),
+      updateEntryButton(item, true)
     ].filter(Boolean).join("");
 
     renderAndRefresh(`
       <article class="record-page">
         <nav class="breadcrumbs" aria-label="Breadcrumb">
           <button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><button type="button" onclick="showHome()">Home</button>
-          ${wrapParent ? `<span>&rsaquo;</span><button type="button" onclick="showWrapUp('${window.BOTSOP_UI.escape(wrapParent.id)}')">${window.BOTSOP_UI.escape(wrapParent.title)}</button>` : ""}
           ${requestType ? `<span>&rsaquo;</span><button type="button" onclick="showSection('${window.BOTSOP_UI.escape(requestType.id)}')">${window.BOTSOP_UI.escape(requestType.title)}</button>` : ""}
           <span>&rsaquo;</span><span>${window.BOTSOP_UI.escape(item.title)}</span>
         </nav>
         <header class="record-header">
           <span class="record-header__icon">${window.BOTSOP_UI.icon(item.icon || "file-text")}</span>
-          <div>${item.baseSection ? `<p>${window.BOTSOP_UI.escape(item.baseSection)}</p>` : ""}<h1>${window.BOTSOP_UI.escape(item.title)}${badge ? `<span class="entry-new-badge entry-new-badge--header">${window.BOTSOP_UI.escape(badge)}</span>` : ""}</h1>${item.summary ? `<span>${window.BOTSOP_UI.escape(item.summary)}</span>` : ""}</div>
+          <div><p>${window.BOTSOP_UI.escape(item.displayType || "Guidance")}</p><h1>${window.BOTSOP_UI.escape(item.title)}${badge ? `<span class="entry-new-badge entry-new-badge--header">${window.BOTSOP_UI.escape(badge)}</span>` : ""}</h1>${item.summary ? `<span>${window.BOTSOP_UI.escape(item.summary)}</span>` : ""}</div>
         </header>
         <div class="record-meta">${meta}</div>
         ${window.BOTSOP_UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
@@ -330,7 +283,6 @@ window.appState = {
     const prior = window.appState.history.pop();
     if (!prior || prior.view === "home") return window.showHome(false);
     if (prior.view === "section") return window.showSection(prior.id, false);
-    if (prior.view === "wrap") return window.showWrapUp(prior.id, false);
     if (prior.view === "search") return window.showSearch(prior.query, false, prior.scrollY);
     if (prior.view === "favorites") return window.showFavorites(false);
     if (prior.view === "updates") return window.showUpdateArchive(prior.id, false);
@@ -374,7 +326,7 @@ window.appState = {
       <div class="page-stack">
         <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon("search")}</span><div><h2>${query ? "Search Results" : "Filtered Results"}</h2><p>${resultDescription}</p></div></header>
         <div class="process-grid">${matches.map(window.BOTSOP_UI.processCard).join("")}</div>
-        ${!matches.length ? `<section class="empty-state"><h2>No matches found</h2><p>Try a different title, keyword, request type, or resource name.</p></section>` : ""}
+        ${!matches.length ? `<section class="empty-state"><h2>No matches found</h2><p>Try a different title, keyword, category, or resource name.</p></section>` : ""}
       </div>
     `);
     if (restoreScroll) requestAnimationFrame(() => window.scrollTo(0, restoreScroll));
@@ -543,7 +495,7 @@ window.appState = {
     const contentOptions = [...new Set(
       [...window.baseModel.items, ...window.baseModel.documents]
         .flatMap(item => [item.category, item.displayType])
-        .filter(value => value && value !== "Request Type")
+        .filter(value => value && value !== "Left Nav")
     )].sort((a, b) => a.localeCompare(b));
     contentType.insertAdjacentHTML("beforeend", contentOptions.map(value => `<option value="${window.BOTSOP_UI.escape(value)}">${window.BOTSOP_UI.escape(value)}</option>`).join(""));
     requestType.insertAdjacentHTML("beforeend", window.baseModel.requestTypes.map(item => `<option value="${window.BOTSOP_UI.escape(item.title)}">${window.BOTSOP_UI.escape(item.title)}</option>`).join(""));
@@ -643,7 +595,4 @@ window.appState = {
 
   initializeApp();
 
-  window.refreshBotSop = function refreshBotSop() {
-    window.BOTSOP_DATA_CACHE?.refresh?.();
-  };
 })();
