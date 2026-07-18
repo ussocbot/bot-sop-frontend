@@ -266,16 +266,6 @@ window.navigationItems = [];
     const rawLinkedTasks = findField(fields, ["Linked Tasks"]);
     const guidanceAttachments = attachmentList(rawScreenshotGuidance);
 
-    const featuredIn = listValue(findField(fields, [
-      "Featured In", "Feature In", "Featured Placement", "Feature Placement"
-    ]));
-    if (boolValue(findField(fields, [
-      "Featured in Important News", "Feature in Important News", "Featured Important News"
-    ]), false)) featuredIn.push("Important News");
-    if (boolValue(findField(fields, [
-      "Featured in SOP Updates", "Feature in SOP Updates", "Featured SOP Updates"
-    ]), false)) featuredIn.push("SOP Updates");
-
     const item = {
       id,
       recordId: record.record_id || "",
@@ -299,7 +289,6 @@ window.navigationItems = [];
       ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
       badge: textValue(findField(fields, ["Badge"])),
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
-      featuredIn: [...new Set(featuredIn)],
       featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
       updateDateRaw: textValue(findField(fields, ["Update Date", "Last Updated"])),
@@ -444,7 +433,8 @@ window.navigationItems = [];
           ? new Set(["important news", "news"])
           : new Set(["sop updates", "sop update"]);
         return publishedItems
-          .filter(item => item.featuredIn.some(value => placementAliases.has(normalizeKey(value))))
+          .filter(item => item.displayType === "Content")
+          .filter(item => item.appearsIn.some(value => placementAliases.has(normalizeKey(value))))
           .map(item => {
             const raw = String(item.updateDateRaw || item.publishDate || "").trim();
             const publishedAt = /^\d{10,13}$/.test(raw)

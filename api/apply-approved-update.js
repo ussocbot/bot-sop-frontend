@@ -216,21 +216,21 @@ module.exports = async function handler(req, res) {
       if (submissionType === "New SOP") {
         const category = textValue(findField(fields, ["Proposed Request Type"]));
         if (!category) throw new Error("A Left Nav category is required for a new SOP");
+        const appearsIn = sendNotification ? [category, "SOP Updates"] : [category];
         Object.assign(liveFields, {
           "Record Key": `content-${slug(title)}-${Date.now().toString(36)}`,
           "Display Type": "Content",
-          "Appears In": [category],
+          "Appears In": appearsIn,
           "Status": "Active",
           "Published": true
         });
-        if (sendNotification) liveFields["Featured In"] = ["SOP Updates"];
         liveRecord = await writeRecord(config, liveTableId, liveFields);
       } else {
         if (!targetId) throw new Error("No verified or suggested SOP target was selected");
         if (sendNotification) {
           const currentTarget = await getRecord(config, liveTableId, targetId);
-          const featured = textValue(findField(currentTarget?.fields || {}, ["Featured In"])).split(",").map(value => value.trim()).filter(Boolean);
-          liveFields["Featured In"] = [...new Set([...featured, "SOP Updates"])];
+          const appearsIn = textValue(findField(currentTarget?.fields || {}, ["Appears In"])).split(",").map(value => value.trim()).filter(Boolean);
+          liveFields["Appears In"] = [...new Set([...appearsIn, "SOP Updates"])];
         }
         liveRecord = await writeRecord(config, liveTableId, liveFields, targetId);
       }
@@ -276,7 +276,6 @@ module.exports = async function handler(req, res) {
         "Status": "Active",
         "Published": isNews
       });
-      if (isNews) liveFields["Featured In"] = ["Important News"];
       if (proposedUrl) liveFields.URL = { link: proposedUrl, text: title };
       liveRecord = await writeRecord(config, liveTableId, liveFields);
     } else {
