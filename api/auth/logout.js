@@ -11,5 +11,5 @@ module.exports = async function logout(req, res) {
 
   res.setHeader("Set-Cookie", serializeCookie(SESSION_COOKIE, "", 0));
   res.setHeader("Cache-Control", "no-store");
-  res.redirect(302, "/");
+  return res.redirect(302, "/signed-out.html");
 };
