@@ -11,7 +11,7 @@ window.navigationItems = [];
     "out of scope": "Out of Scope",
     "ban operators": "Ban Operators",
     "ban operators and reasons": "Ban Operators",
-    "oos quick nav": "OOS Quick Nav",
+    "oos quick nav": "Out of Scope",
     "bot tools": "BOT Tools",
     "bot links": "BOT Links",
     "opus links": "OPUS Links",
@@ -232,7 +232,6 @@ window.navigationItems = [];
       "BOT Expectations": ["clock-3", "circle-check-big", "clipboard-check", "badge-check"],
       "Out of Scope": ["route", "signpost", "compass", "flag"],
       "Ban Operators": ["shield-check", "ban", "badge-alert", "list-checks"],
-      "OOS Quick Nav": ["route", "signpost", "compass", "flag", "shield-alert"],
       "BOT Tools": ["wrench", "settings", "hammer", "badge-help"],
       "BOT Links": ["link", "external-link", "bookmark", "book-marked"],
       "OPUS Links": ["link", "external-link", "bookmark", "book-marked"],
@@ -522,7 +521,7 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v18";
+  const DATA_CACHE_KEY = "botsop:base-data:v18-2";
   const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {
