@@ -125,7 +125,7 @@
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
-    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType)) {
+    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType)) {
       return `href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"`;
     }
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
@@ -157,7 +157,7 @@
           ${items.length ? items.map(item => {
             const badge = UI.itemBadge(item);
             return `
-            <a class="side-card__item${["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
+            <a class="side-card__item${["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
                 <span class="side-card__title"><strong>${UI.escape(item.title)}</strong>${badge ? `<em class="side-card__badge">${UI.escape(badge)}</em>` : ""}</span>
                 ${showDescriptions && item.summary ? `<small>${UI.escape(item.summary)}</small>` : ""}
