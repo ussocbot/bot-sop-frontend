@@ -134,7 +134,10 @@ window.appState = {
 
     const expectations = guidanceItemsFor("BOT Expectations");
     const usdsCompliance = guidanceItemsFor("USDS JV Compliance");
-    const outOfScope = guidanceItemsFor("Out of Scope");
+    const outOfScope = uniqueItems([
+      ...guidanceItemsFor("Out of Scope"),
+      ...model.documentsFor("OOS Routing")
+    ]).sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
     const banOperatorsAndReasons = guidanceItemsFor("Ban Operators");
     const warnings = model.section("Warning");
 
@@ -161,7 +164,7 @@ window.appState = {
     }
     window.setActiveNavigation(null);
     const items = uniqueItems([
-      ...model.section("OOS Quick Nav"),
+      ...model.section("Out of Scope"),
       ...model.documentsFor("OOS Routing")
     ]).sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
     renderAndRefresh(`
@@ -237,7 +240,7 @@ window.appState = {
     const item = model?.find(recordId);
     if (!model || !item) return;
     if (item.displayType === "Left Nav") return window.showSection(item.id, addToHistory);
-    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links", "OOS Quick Nav"].includes(item.displayType) && item.sourceType !== "Documentation") {
+    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType) && item.sourceType !== "Documentation") {
       if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
       return;
     }
