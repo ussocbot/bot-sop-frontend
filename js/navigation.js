@@ -6,7 +6,7 @@
     const model = window.baseModel;
     if (!nav || !model) return;
 
-    const callouts = model.section("OOS Quick Nav");
+    const callouts = model.section("Out of Scope");
     const oosRoutes = model.documentsFor("OOS Routing");
     const allOosRoutes = [...new Map([...callouts, ...oosRoutes].map(item => [item.id, item])).values()]
       .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
