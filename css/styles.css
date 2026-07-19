@@ -58,6 +58,10 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .submit-resource-button[hidden] { display: none; }
 .signed-in { display: flex; align-items: center; gap: 7px; max-width: 160px; }
 .signed-in span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sign-out-button { justify-content: center; }
+.sign-out-button.is-signing-out { color: #fff; background: rgba(255,255,255,.2); cursor: wait; pointer-events: none; }
+.sign-out-button.is-signing-out svg { animation: sign-out-spin .8s linear infinite; }
+@keyframes sign-out-spin { to { transform: rotate(360deg); } }
 
 .app-layout { display: grid; grid-template-columns: 250px minmax(0, 1fr) 300px; max-width: 1720px; min-height: calc(100vh - 82px); margin: 0 auto; }
 .left-sidebar, .right-sidebar { align-self: start; position: sticky; top: 82px; max-height: calc(100vh - 82px); overflow: auto; }
