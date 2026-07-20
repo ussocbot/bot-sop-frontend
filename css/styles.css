@@ -260,6 +260,14 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .detail-section--related .detail-link-list { padding: 8px; }
 .detail-section--related .detail-link-row { margin-bottom: 7px; overflow: hidden; border: 1px solid #d5e2f2; border-radius: 9px; background: rgba(255,255,255,.92); }
 .detail-section--related .detail-link-row:last-child { margin-bottom: 0; }
+.closing-guidance-list { display: grid; gap: 6px; padding: 6px; }
+.closing-guidance-row { overflow: hidden; padding: 12px 14px; border: 1px solid #d5e2f2; border-radius: 7px; background: rgba(255,255,255,.92); }
+.closing-guidance-row > h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; color: #23466f; font-size: 12px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+.closing-guidance-row > h3 svg { width: 15px; height: 15px; }
+.closing-guidance-row > div { color: #263a52; font-size: 15px; line-height: 1.65; }
+.closing-guidance-row > div > :first-child { margin-top: 0; }
+.closing-guidance-row > div > :last-child { margin-bottom: 0; }
+.closing-guidance-row--tags > div { font-weight: 700; }
 .formatted-content .detail-section__body > :first-child, .expectation-item__body > :first-child { margin-top: 0; }
 .formatted-content .detail-section__body > :last-child, .expectation-item__body > :last-child { margin-bottom: 0; }
 .formatted-content h3, .formatted-content h4, .formatted-content h5, .expectation-item__body h3, .expectation-item__body h4, .expectation-item__body h5 { margin: 18px 0 7px; line-height: 1.3; }
