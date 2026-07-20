@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { fetchJson, getTenantToken } = require("../lib/feishu");
+const { getSubmissionAccess } = require("../lib/submission-access");
 
 const RECORD_ID = /^rec[A-Za-z0-9_-]+$/;
 const TRANSIENT_STATUSES = new Set([502, 503, 504]);
@@ -185,8 +186,14 @@ module.exports = async function handler(req, res) {
 
   const body = bodyOf(req);
   const expectedSecret = process.env.UPDATE_APPLY_SECRET;
-  if (!secretMatches(providedSecret(req, body), expectedSecret)) {
-    return res.status(401).json({ error: "Invalid automation secret" });
+  const automationAuthorized = secretMatches(providedSecret(req, body), expectedSecret);
+  if (!automationAuthorized) {
+    try {
+      const access = await getSubmissionAccess(req);
+      if (!access?.canReviewUpdates) return res.status(403).json({ error: "Review access is required" });
+    } catch (error) {
+      return res.status(error.status || 401).json({ error: String(error.message || "Unable to verify review access") });
+    }
   }
 
   const requestRecordId = String(body.recordId || body.record_id || "").trim();
