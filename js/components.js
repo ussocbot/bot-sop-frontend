@@ -315,16 +315,13 @@
   };
 
   UI.processAccordion = function processAccordion(item, favoriteHtml = "", layout = "default") {
-    const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
     const badge = UI.itemBadge(item);
     return `
-      <details class="process-accordion" data-accordion-group="process-guidance">
+      <details class="process-accordion process-accordion--compact" data-accordion-group="process-guidance">
         <summary>
           <span class="process-card__icon">${UI.icon(item.icon || "file-text")}</span>
           <span class="process-accordion__preview">
-            <em class="content-kind">${kind}</em>
             <strong>${UI.escape(item.title)}${badge ? `<span class="entry-new-badge">${UI.escape(badge)}</span>` : ""}</strong>
-            <small>${UI.escape(item.description || "Open guidance")}</small>
           </span>
           ${UI.icon("chevron-down", "process-accordion__chevron")}
         </summary>

@@ -75,33 +75,34 @@ window.appState = {
 
   function groupedContentList(items, layout = "default") {
     const groups = new Map();
-    const ungrouped = [];
+    const nodes = [];
     items.forEach(item => {
       const name = String(item.contentGroup || "").trim();
       if (!name) {
-        ungrouped.push(item);
+        nodes.push({ type: "item", name: item.title, item });
         return;
       }
       const key = placementKey(name);
       if (!groups.has(key)) groups.set(key, { name, items: [] });
       groups.get(key).items.push(item);
     });
-    const grouped = [...groups.values()].sort((a, b) => {
-      const firstA = Math.min(...a.items.map(item => item.sortOrder || 9999));
-      const firstB = Math.min(...b.items.map(item => item.sortOrder || 9999));
-      return firstA - firstB || a.name.localeCompare(b.name);
+    groups.forEach(group => {
+      group.items.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
+      nodes.push({ type: "group", name: group.name, group });
     });
+    nodes.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
     return `
       <div class="content-group-list">
-        ${ungrouped.length ? processAccordionList(ungrouped, layout) : ""}
-        ${grouped.map(group => `
-          <details class="content-subgroup" data-accordion-group="content-subgroups">
+        ${nodes.map(node => node.type === "item"
+          ? processAccordionList([node.item], layout)
+          : `
+          <details class="content-subgroup" open>
             <summary>
-              <span>${window.BOTSOP_UI.icon("folder-tree")}<strong>${window.BOTSOP_UI.escape(group.name)}</strong></span>
-              <small>${group.items.length} entr${group.items.length === 1 ? "y" : "ies"}</small>
+              <span>${window.BOTSOP_UI.icon("folder-tree")}<strong>${window.BOTSOP_UI.escape(node.group.name)}</strong></span>
+              <small>${node.group.items.length} entr${node.group.items.length === 1 ? "y" : "ies"}</small>
               ${window.BOTSOP_UI.icon("chevron-down", "content-subgroup__chevron")}
             </summary>
-            <div class="content-subgroup__body">${processAccordionList(group.items, layout)}</div>
+            <div class="content-subgroup__body">${processAccordionList(node.group.items, layout)}</div>
           </details>
         `).join("")}
       </div>

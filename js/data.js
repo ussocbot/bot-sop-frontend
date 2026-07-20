@@ -522,7 +522,7 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v18-4";
+  const DATA_CACHE_KEY = "botsop:base-data:v18-5";
   const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {
