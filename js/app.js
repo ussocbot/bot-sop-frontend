@@ -130,12 +130,13 @@ window.appState = {
     if (!window.baseMeta?.favoritesEnabled || !item.recordId || item.displayType === "Left Nav") return "";
     const active = window.appState.favorites.has(favoriteKey(item));
     const pending = window.appState.favoritePending.has(favoriteKey(item));
-    return `<button type="button" data-favorite-id="${window.BOTSOP_UI.escape(item.id)}" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')"${pending ? " disabled" : ""}>${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")} ${pending ? "Saving..." : (active ? "Remove from Favorites" : "Add to Favorites")}</button>`;
+    const label = pending ? "Saving favorite" : (active ? "Remove from Favorites" : "Add to Favorites");
+    return `<button type="button" data-favorite-id="${window.BOTSOP_UI.escape(item.id)}" class="favorite-button${compact ? " favorite-button--meta" : ""}${active ? " is-favorite" : ""}" onclick="toggleFavorite('${window.BOTSOP_UI.escape(item.id)}')" aria-label="${label}" title="${label}"${pending ? " disabled" : ""}>${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")}<span class="entry-action-label">${label}</span></button>`;
   }
 
   function sendToMeButton(item) {
     if (!window.baseMeta?.sendToMeEnabled || !item.recordId || item.displayType === "Left Nav") return "";
-    return `<button type="button" class="send-to-me-button" onclick="sendToMe('${window.BOTSOP_UI.escape(item.id)}', this)">${window.BOTSOP_UI.icon("send")} Send to Me</button>`;
+    return `<button type="button" class="send-to-me-button" onclick="sendToMe('${window.BOTSOP_UI.escape(item.id)}', this)" aria-label="Send to Me" title="Send to Me">${window.BOTSOP_UI.icon("send")}<span class="entry-action-label">Send to Me</span></button>`;
   }
 
   function updateEntryButton(item, compact = false) {
@@ -145,7 +146,7 @@ window.appState = {
       item.sourceType === "Documentation" ||
       item.displayType === "Left Nav"
     ) return "";
-    return `<button type="button" class="update-entry-button${compact ? " update-entry-button--meta" : ""}" onclick="openUpdateSubmission('${window.BOTSOP_UI.escape(item.id)}')">${window.BOTSOP_UI.icon("square-pen")} Update this SOP</button>`;
+    return `<button type="button" class="update-entry-button${compact ? " update-entry-button--meta" : ""}" onclick="openUpdateSubmission('${window.BOTSOP_UI.escape(item.id)}')" aria-label="Update this SOP" title="Update this SOP">${window.BOTSOP_UI.icon("square-pen")}<span class="entry-action-label">Update this SOP</span></button>`;
   }
 
   function entryActionButtons(item) {
@@ -451,7 +452,10 @@ window.appState = {
       if (button.dataset.favoriteId !== item.id) return;
       button.classList.toggle("is-favorite", active);
       button.disabled = pending;
-      button.innerHTML = `${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")} ${pending ? "Saving..." : (active ? "Remove from Favorites" : "Add to Favorites")}`;
+      const label = pending ? "Saving favorite" : (active ? "Remove from Favorites" : "Add to Favorites");
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.innerHTML = `${window.BOTSOP_UI.icon(pending ? "loader-circle" : "star")}<span class="entry-action-label">${label}</span>`;
     });
     window.BOTSOP_UI.refreshIcons();
   }
@@ -463,7 +467,9 @@ window.appState = {
     if (button) {
       button.disabled = true;
       button.classList.remove("is-sent", "is-error");
-      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")} Sending...`;
+      button.setAttribute("aria-label", "Sending to Feishu");
+      button.title = "Sending to Feishu";
+      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")}<span class="entry-action-label">Sending to Feishu</span>`;
       window.BOTSOP_UI.refreshIcons();
     }
     try {
@@ -477,12 +483,15 @@ window.appState = {
       if (!response.ok) throw new Error(payload.error || "Unable to send this entry");
       if (button) {
         button.classList.add("is-sent");
-        button.innerHTML = `${window.BOTSOP_UI.icon("check")} Sent to Feishu`;
+        button.setAttribute("aria-label", "Sent to Feishu");
+        button.title = "Sent to Feishu";
+        button.innerHTML = `${window.BOTSOP_UI.icon("check")}<span class="entry-action-label">Sent to Feishu</span>`;
       }
     } catch (error) {
       if (button) {
         button.classList.add("is-error");
-        button.innerHTML = `${window.BOTSOP_UI.icon("triangle-alert")} Send failed`;
+        button.setAttribute("aria-label", "Send failed");
+        button.innerHTML = `${window.BOTSOP_UI.icon("triangle-alert")}<span class="entry-action-label">Send failed</span>`;
         button.title = error.message;
       }
     } finally {
@@ -493,7 +502,8 @@ window.appState = {
           if (!button.isConnected) return;
           button.classList.remove("is-sent", "is-error");
           button.innerHTML = original;
-          button.title = "";
+          button.setAttribute("aria-label", "Send to Me");
+          button.title = "Send to Me";
           window.BOTSOP_UI.refreshIcons();
         }, 2500);
       }
