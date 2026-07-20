@@ -1,15 +1,15 @@
-const CACHE_NAME = "bot-sop-static-v18-9";
+const CACHE_NAME = "bot-sop-static-v18-10";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/signed-out.html",
-  "/css/styles.css?v=2026.07.19-v18.9",
-  "/js/data.js?v=2026.07.19-v18.9",
-  "/js/components.js?v=2026.07.19-v18.9",
-  "/js/navigation.js?v=2026.07.19-v18.9",
-  "/js/reviews.js?v=2026.07.19-v18.9",
-  "/js/submissions.js?v=2026.07.19-v18.9",
-  "/js/app.js?v=2026.07.19-v18.9",
+  "/css/styles.css?v=2026.07.19-v18.10",
+  "/js/data.js?v=2026.07.19-v18.10",
+  "/js/components.js?v=2026.07.19-v18.10",
+  "/js/navigation.js?v=2026.07.19-v18.10",
+  "/js/reviews.js?v=2026.07.19-v18.10",
+  "/js/submissions.js?v=2026.07.19-v18.10",
+  "/js/app.js?v=2026.07.19-v18.10",
   "/vendor/lucide.min.js?v=0.468.0",
   "/assets/gear-favicon.svg"
 ];
@@ -29,6 +29,19 @@ self.addEventListener("fetch", event => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+          return response;
+        })
+        .catch(() => caches.match(request).then(cached => cached || caches.match("/index.html")))
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then(cached => {
       const fresh = fetch(request).then(response => {
