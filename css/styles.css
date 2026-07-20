@@ -346,7 +346,6 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .special-request-icon { width: 13px; height: 13px; color: #ffd45a; fill: rgba(255,212,90,.22); vertical-align: -2px; }
 .entry-new-badge { display: inline-flex; align-items: center; margin-left: 8px; padding: 2px 7px; border: 1px solid #efb4ba; border-radius: 999px; color: #a12633; background: #fff1f2; font-size: 9px; font-style: normal; font-weight: 800; line-height: 1.2; text-transform: uppercase; vertical-align: 1px; }
 .entry-new-badge--header { font-size: 10px; vertical-align: middle; }
-.formatted-content__strong-heading { margin: 20px 0 8px; padding: 8px 11px; border-left: 4px solid var(--blue-600); border-radius: 6px; background: #eef5ff; font-size: 18px !important; }
 .content-divider { height: 1px; margin: 22px 0; border: 0; background: linear-gradient(90deg, transparent, #9fb2ca 14%, #9fb2ca 86%, transparent); }
 .formatted-list--depth-2 { margin-left: 22px !important; list-style-type: circle; }
 .formatted-list--depth-3 { margin-left: 44px !important; list-style-type: square; }
