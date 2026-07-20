@@ -69,22 +69,15 @@
         closeList();
         return;
       }
-      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      const heading = line.match(/^##\s+(.+)$/);
       if (heading) {
         closeList();
-        const level = heading[1].length + 2;
-        html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
+        html.push(`<h3>${inline(heading[1])}</h3>`);
         return;
       }
       if (/^\s*___+\s*$/.test(line)) {
         closeList();
         html.push('<hr class="content-divider">');
-        return;
-      }
-      const strongHeading = line.match(/^\s*\*\*([^*\n]+)\*\*\s*$/);
-      if (strongHeading) {
-        closeList();
-        html.push(`<h3 class="formatted-content__strong-heading">${inline(strongHeading[1])}</h3>`);
         return;
       }
       const nestedBullet = line.match(/^\s*(-{1,3}|\*)\s+(.+)$/);
