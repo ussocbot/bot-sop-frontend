@@ -276,7 +276,7 @@ window.appState = {
     const item = model?.find(recordId);
     if (!model || !item) return;
     if (item.displayType === "Left Nav") return window.showSection(item.id, addToHistory);
-    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType) && item.sourceType !== "Documentation") {
+    if (["BOT Tools", "Team Links", "OPUS Links", "QA Links"].includes(item.displayType) && item.sourceType !== "Documentation") {
       if (item.url) window.open(item.url, "_blank", "noopener,noreferrer");
       return;
     }

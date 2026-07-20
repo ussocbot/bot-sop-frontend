@@ -126,13 +126,12 @@
         <div class="closing-guidance-list">
           ${closingGuidance ? `
             <section class="closing-guidance-row formatted-content">
-              <h3>${UI.icon("message-square-text")} Closing Guidance</h3>
               <div>${UI.markdown(closingGuidance)}</div>
             </section>
           ` : ""}
           ${ticketTags ? `
             <section class="closing-guidance-row closing-guidance-row--tags">
-              <h3>${UI.icon("tags")} Ticket Tags</h3>
+              ${UI.icon("tags")}
               <div>${UI.textBlocks(ticketTags)}</div>
             </section>
           ` : ""}
@@ -148,7 +147,7 @@
     if (item.url) {
       return `href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer"`;
     }
-    if (["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType)) {
+    if (["BOT Tools", "Team Links", "OPUS Links", "QA Links"].includes(item.displayType)) {
       return `href="#" aria-disabled="true" title="URL required" onclick="event.preventDefault()"`;
     }
     return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
@@ -167,7 +166,7 @@
   };
 
   UI.sidebarCard = function sidebarCard(title, iconName, items, tone, collapsible = false, viewAllKey = "", totalCount = items.length) {
-    const showDescriptions = !["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(title);
+    const showDescriptions = !["BOT Tools", "Team Links", "OPUS Links", "QA Links"].includes(title);
     const cardTag = collapsible ? "details" : "section";
     const headerTag = collapsible ? "summary" : "header";
     return `
@@ -180,7 +179,7 @@
           ${items.length ? items.map(item => {
             const badge = UI.itemBadge(item);
             return `
-            <a class="side-card__item${["BOT Tools", "BOT Links", "OPUS Links", "QA Links"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
+            <a class="side-card__item${["BOT Tools", "Team Links", "OPUS Links", "QA Links"].includes(item.displayType) && !item.url ? " is-disabled" : ""}" ${UI.actionAttributes(item)}>
               <span>
                 <span class="side-card__title"><strong>${UI.escape(item.title)}</strong>${badge ? `<em class="side-card__badge">${UI.escape(badge)}</em>` : ""}</span>
                 ${showDescriptions && item.summary ? `<small>${UI.escape(item.summary)}</small>` : ""}
@@ -215,7 +214,7 @@
       UI.sidebarCard("SOP Updates", "file-clock", sopUpdates.slice(0, 4), "yellow", false, "sop-updates", sopUpdates.length),
       macroUpdates.length ? UI.sidebarCard("Macro Updates", "message-square-more", macroUpdates.slice(0, 4), "teal", false, "macro-updates", macroUpdates.length) : "",
       UI.sidebarCard("BOT Tools", "wrench", [...model.section("BOT Tools"), ...model.documentsFor("BOT Tools")], "blue", true),
-      UI.sidebarCard("BOT Links", "bot", [...model.section("BOT Links"), ...model.documentsFor("BOT Links")], "blue", true),
+      UI.sidebarCard("Team Links", "users", [...model.section("Team Links"), ...model.documentsFor("Team Links")], "blue", true),
       UI.sidebarCard("OPUS Links", "link", [...model.section("OPUS Links"), ...model.documentsFor("OPUS Links")], "violet", true),
       UI.sidebarCard("QA Links", "badge-check", [...model.section("QA Links"), ...model.documentsFor("QA Links")], "teal", true)
     ].join("");
@@ -459,10 +458,13 @@
     if (!item?.url) return "";
     return `
       <section class="oos-primary-resource">
-        <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
-          <span>${UI.icon("external-link")}<strong>${UI.escape(item.ctaLabel || "Open Resource")}</strong></span>
-          ${UI.icon("arrow-up-right")}
-        </a>
+        <div class="oos-primary-resource__row">
+          <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+            <span>${UI.icon("external-link")}<strong>${UI.escape(item.url)}</strong></span>
+            ${UI.icon("arrow-up-right")}
+          </a>
+          <button type="button" class="copy-link-button" data-copy-url="${UI.escape(item.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy OOS resource link" title="Copy link">${UI.icon("copy")}</button>
+        </div>
       </section>
     `;
   };

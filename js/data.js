@@ -13,7 +13,7 @@ window.navigationItems = [];
     "ban operators and reasons": "Ban Operators",
     "oos quick nav": "Out of Scope",
     "bot tools": "BOT Tools",
-    "bot links": "BOT Links",
+    "team links": "Team Links",
     "opus links": "OPUS Links",
     "qa links": "QA Links",
     "important news": "Important News",
@@ -233,7 +233,7 @@ window.navigationItems = [];
       "Out of Scope": ["route", "signpost", "compass", "flag"],
       "Ban Operators": ["shield-check", "ban", "badge-alert", "list-checks"],
       "BOT Tools": ["wrench", "settings", "hammer", "badge-help"],
-      "BOT Links": ["link", "external-link", "bookmark", "book-marked"],
+      "Team Links": ["users", "link", "external-link", "bookmark"],
       "OPUS Links": ["link", "external-link", "bookmark", "book-marked"],
       "QA Links": ["badge-check", "link", "external-link", "bookmark"],
       "Important News": ["megaphone", "newspaper", "bell", "radio"],
@@ -522,7 +522,7 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v18-7";
+  const DATA_CACHE_KEY = "botsop:base-data:v18-8";
   const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {
