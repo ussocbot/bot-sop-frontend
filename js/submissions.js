@@ -77,8 +77,19 @@
 
   function categoryChoices() {
     const titles = (window.baseModel?.requestTypes || []).map(item => item.title);
-    if (contextItems("Out of Scope").length) titles.push("Out of Scope");
+    if (contextItems("Out of Scope").length || (window.baseModel?.items || []).some(item => item.displayType === "Out of Scope")) titles.push("Out of Scope");
     return [...new Set(titles)].sort((a, b) => a.localeCompare(b));
+  }
+
+  function relatedTargetChoices(category) {
+    if (key(category) === "out of scope") {
+      return (window.baseModel?.items || [])
+        .filter(item => item.displayType === "Out of Scope" && item.recordId)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+    }
+    return contextItems(category)
+      .filter(item => item.recordId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
   }
 
   function groupChoices(category) {
@@ -191,8 +202,14 @@
         <header><h2>Suggest a Related Resource or Task</h2><p>Send a direct link, existing Resource Hub entry, or existing SOP task to the same review queue.</p></header>
         <form class="submission-form" id="related-suggestion-form">
           <div class="submission-grid">
-            <div class="submission-related-target"><span>Suggestion for</span><strong id="related-target-title">${escape(state.relatedTargetTitle || "Choose an SOP entry first")}</strong></div>
-            <input id="related-target-id" type="hidden" value="${escape(state.relatedTargetId)}">
+            <section class="workflow-selector submission-related-selector">
+              <header><h3>Choose the SOP entry</h3><p>Select a left navigation category, then the exact guidance this item belongs to.</p></header>
+              <div class="workflow-selector__fields">
+                <label class="submission-field"><span>Left Navigation Category</span><select id="related-target-category" required></select></label>
+                <label class="submission-field"><span>Existing Guidance</span><select id="related-target-id" required disabled></select></label>
+              </div>
+              <div class="submission-related-target"><span>Suggestion for</span><strong id="related-target-title">${escape(state.relatedTargetTitle || "No SOP entry selected")}</strong></div>
+            </section>
             <label class="submission-field"><span>Suggestion Type</span><select id="related-kind"><option value="link">New direct link</option><option value="resource">Existing Resource Hub entry</option><option value="task">Existing SOP task</option></select></label>
             <label class="submission-field" data-related-link><span>Link Name</span><input id="related-title" maxlength="300" placeholder="Name shown in Related Resources"></label>
             <label class="submission-field" data-related-link><span>URL</span><input id="related-url" type="url" placeholder="https://"></label>
@@ -541,7 +558,7 @@
     event.preventDefault();
     const button = event.currentTarget.querySelector("button[type=submit]");
     const targetId = document.getElementById("related-target-id")?.value || "";
-    if (!targetId) return setStatus("related-status", "Open the SOP entry first, then select Suggest a Related Resource or Task.", "error");
+    if (!targetId) return setStatus("related-status", "Choose the SOP entry this suggestion belongs to.", "error");
     button.disabled = true;
     try {
       const kind = document.getElementById("related-kind").value;
@@ -556,7 +573,7 @@
         body: JSON.stringify({
           kind: "relation_suggestion",
           targetSopId: targetId,
-          targetTitle: state.relatedTargetTitle,
+          targetTitle: selectedText(document.getElementById("related-target-id")) || state.relatedTargetTitle,
           relationKind: kind,
           title: suggestionTitle,
           url: document.getElementById("related-url")?.value || "",
@@ -578,6 +595,44 @@
     document.querySelectorAll("[data-related-link]").forEach(element => { element.hidden = kind !== "link"; });
     document.querySelectorAll("[data-related-resource]").forEach(element => { element.hidden = kind !== "resource"; });
     document.querySelectorAll("[data-related-task]").forEach(element => { element.hidden = kind !== "task"; });
+  }
+
+  function bindRelatedTargetSelector() {
+    const category = document.getElementById("related-target-category");
+    const target = document.getElementById("related-target-id");
+    const title = document.getElementById("related-target-title");
+    if (!category || !target || !title) return;
+
+    category.innerHTML = optionList(categoryChoices(), "Select a left navigation category");
+
+    const fillTargets = selectedId => {
+      const items = relatedTargetChoices(category.value);
+      target.innerHTML = optionList(items.map(item => ({ value: item.recordId, title: item.title })), "Select existing guidance");
+      target.disabled = !category.value;
+      if (selectedId && items.some(item => item.recordId === selectedId)) target.value = selectedId;
+      const chosen = items.find(item => item.recordId === target.value);
+      state.relatedTargetId = chosen?.recordId || "";
+      state.relatedTargetTitle = chosen?.title || "";
+      title.textContent = chosen?.title || "No SOP entry selected";
+    };
+
+    category.addEventListener("change", () => fillTargets(""));
+    target.addEventListener("change", () => {
+      const chosen = relatedTargetChoices(category.value).find(item => item.recordId === target.value);
+      state.relatedTargetId = chosen?.recordId || "";
+      state.relatedTargetTitle = chosen?.title || "";
+      title.textContent = chosen?.title || "No SOP entry selected";
+    });
+
+    if (state.relatedTargetId) {
+      const matchingCategory = categoryChoices().find(value => relatedTargetChoices(value).some(item => item.recordId === state.relatedTargetId));
+      if (matchingCategory) {
+        category.value = matchingCategory;
+        fillTargets(state.relatedTargetId);
+      }
+    } else {
+      target.innerHTML = '<option value="">Select a category first</option>';
+    }
   }
 
   function syncUpdateType() {
@@ -628,6 +683,7 @@
     document.querySelectorAll(".submission-tab").forEach(button => button.addEventListener("click", () => activateTab(button.dataset.tab)));
     bindWorkflowSelector("resource-workflow");
     bindWorkflowSelector("update-workflow");
+    bindRelatedTargetSelector();
     ["resource-instruction", "update-instruction", "update-closing"].forEach(bindEditor);
     bindFileList("resource-screenshots", "resource-screenshot-list");
     bindFileList("update-screenshots", "update-screenshot-list");

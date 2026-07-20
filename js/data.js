@@ -303,6 +303,7 @@ window.navigationItems = [];
       ticketTags: listValue(findField(fields, ["Ticket Tags"])),
       keywords: listValue(findField(fields, ["Search Keywords", "Keywords", "Tags"])),
       category: textValue(findField(fields, ["Category", "Content Type", "Topic"])),
+      contentGroup: textValue(findField(fields, ["Content Group"])),
       ticketTagDisplay: textValue(findField(fields, ["Ticket Tag Display"])),
       closingGuidance: richTextValue(findField(fields, ["Closing Guidance"])),
       workflow: textValue(findField(fields, ["Workflow"])) || "BOT"
@@ -521,7 +522,7 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v18-2";
+  const DATA_CACHE_KEY = "botsop:base-data:v18-3";
   const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
 
   function installPayload(payload) {

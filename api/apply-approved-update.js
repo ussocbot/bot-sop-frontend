@@ -2,6 +2,24 @@ const crypto = require("crypto");
 const { fetchJson, getTenantToken } = require("../lib/feishu");
 
 const RECORD_ID = /^rec[A-Za-z0-9_-]+$/;
+const TRANSIENT_STATUSES = new Set([502, 503, 504]);
+
+function wait(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+async function fetchFeishu(url, options) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await fetchJson(url, options);
+    } catch (error) {
+      const retryable = TRANSIENT_STATUSES.has(Number(error.status));
+      if (!retryable || attempt === 2) throw error;
+      await wait(500 * (2 ** attempt));
+    }
+  }
+  throw new Error("Feishu request failed after retrying");
+}
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -116,7 +134,7 @@ async function getRecord(config, tableId, recordId) {
     config.apiOrigin
   );
   url.searchParams.set("user_id_type", "open_id");
-  const result = await fetchJson(url, { headers: { Authorization: `Bearer ${config.tenantToken}` } });
+  const result = await fetchFeishu(url, { headers: { Authorization: `Bearer ${config.tenantToken}` } });
   return result.data?.record || result.data || null;
 }
 
@@ -128,7 +146,7 @@ async function writeRecord(config, tableId, fields, recordId = "") {
     config.apiOrigin
   );
   url.searchParams.set("user_id_type", "open_id");
-  const result = await fetchJson(url, {
+  const result = await fetchFeishu(url, {
     method: recordId ? "PUT" : "POST",
     headers: {
       Authorization: `Bearer ${config.tenantToken}`,

@@ -50,6 +50,23 @@
     return normalized || "pending";
   }
 
+  function applyStatusHtml(item, compact = false) {
+    const status = key(item?.applyStatus || "Pending");
+    const configuration = {
+      applied: ["Applied", "circle-check", "applied"],
+      applying: ["Applying", "loader-circle", "applying"],
+      failed: ["Failed", "circle-x", "failed"],
+      pending: ["Pending", "clock-3", "pending"]
+    }[status] || [item?.applyStatus || "Pending", "clock-3", "pending"];
+    return `<span class="apply-status apply-status--${configuration[2]}${compact ? " apply-status--compact" : ""}">${UI().icon(configuration[1])}<span>${escape(configuration[0])}</span></span>`;
+  }
+
+  function retryApplyButton(item) {
+    return key(item?.applyStatus) === "failed"
+      ? `<button type="button" class="review-retry-action" data-retry-apply="${escape(item.recordId)}">${UI().icon("rotate-cw")} Retry Apply</button>`
+      : "";
+  }
+
   function visibleRequests() {
     if (state.filter === "all") return state.requests;
     if (state.filter === "pending") {
@@ -109,7 +126,7 @@
               <strong class="review-queue-item__title">${escape(item.title || item.requestName)}</strong>
               <small>${escape(item.updateType)}</small>
               <small>${escape(item.submissionType || "Not applicable")}</small>
-              <em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em>
+              <span class="review-status-stack"><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em>${applyStatusHtml(item, true)}</span>
               <small>${escape(formatDate(item.submittedAt))}</small>
             </button>
           `).join("") : `<div class="review-queue-empty"><strong>No submissions here</strong><span>Try another status filter.</span></div>`}
@@ -132,7 +149,7 @@
 
   function categoryChoices() {
     const values = (window.baseModel?.requestTypes || []).map(item => item.title);
-    if (contextItems("Out of Scope").length) values.push("Out of Scope");
+    if (contextItems("Out of Scope").length || (window.baseModel?.items || []).some(item => item.displayType === "Out of Scope")) values.push("Out of Scope");
     return [...new Set(values)].sort((a, b) => a.localeCompare(b));
   }
 
@@ -141,6 +158,11 @@
   }
 
   function targetChoices(category, groupId = "") {
+    if (key(category) === "out of scope") {
+      return (window.baseModel?.items || [])
+        .filter(item => item.displayType === "Out of Scope" && item.recordId)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
+    }
     return contextItems(category).sort((a, b) => a.title.localeCompare(b.title));
   }
 
@@ -184,7 +206,8 @@
     const type = item.relationSuggestionType || "New Link";
     return `
       <section class="review-detail" data-review-record="${escape(item.recordId)}">
-        <header class="review-detail__header"><div><span class="review-type-pill">Related Item Suggestion</span><h3>${escape(item.requestName || item.title)}</h3><p>Submitted ${escape(formatDate(item.submittedAt))}${item.submittedBy ? ` by ${escape(item.submittedBy)}` : ""}</p></div><div><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em><small>Apply: ${escape(item.applyStatus)}</small></div></header>
+        <header class="review-detail__header"><div><span class="review-type-pill">Related Item Suggestion</span><h3>${escape(item.requestName || item.title)}</h3><p>Submitted ${escape(formatDate(item.submittedAt))}${item.submittedBy ? ` by ${escape(item.submittedBy)}` : ""}</p></div><div><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em>${applyStatusHtml(item)}</div></header>
+        ${item.applyError ? `<div class="review-error-banner"><strong>Apply error</strong>${escape(item.applyError)}</div>` : ""}
         <form id="review-edit-form" class="submission-form">
           <input type="hidden" id="review-update-type" value="Related Item Suggestion">
           <div class="submission-grid">
@@ -197,7 +220,7 @@
             <label class="submission-field submission-field--wide"><span>Reason for Suggestion</span><textarea id="review-reason">${escape(item.reason)}</textarea></label>
             <label class="submission-field submission-field--wide"><span>Reviewer Notes</span><textarea id="review-notes" placeholder="Required when requesting changes or rejecting">${escape(item.reviewNotes)}</textarea></label>
           </div>
-          <div class="review-action-bar"><span id="review-action-status" class="submission-status"></span><button type="button" class="secondary-action" data-review-action="save">Save Changes</button><button type="button" class="review-needs-action" data-review-action="needs_changes">Needs Changes</button><button type="button" class="review-reject-action" data-review-action="reject">Reject</button><button type="button" class="submission-submit review-approve-action" data-review-action="approve">${UI().icon("badge-check")} Approve</button></div>
+          <div class="review-action-bar"><span id="review-action-status" class="submission-status"></span>${retryApplyButton(item)}<button type="button" class="secondary-action" data-review-action="save">Save Changes</button><button type="button" class="review-needs-action" data-review-action="needs_changes">Needs Changes</button><button type="button" class="review-reject-action" data-review-action="reject">Reject</button><button type="button" class="submission-submit review-approve-action" data-review-action="approve">${UI().icon("badge-check")} Approve</button></div>
         </form>
       </section>
     `;
@@ -233,7 +256,7 @@
       <section class="review-detail" data-review-record="${escape(item.recordId)}">
         <header class="review-detail__header">
           <div><span class="review-type-pill">${escape(item.updateType)}</span><h3>${escape(item.requestName || item.title)}</h3><p>Submitted ${escape(formatDate(item.submittedAt))}${item.submittedBy ? ` by ${escape(item.submittedBy)}` : ""}</p></div>
-          <div><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em><small>Apply: ${escape(item.applyStatus)}</small></div>
+          <div><em class="review-status review-status--${statusClass(item.reviewStatus)}">${escape(item.reviewStatus)}</em>${applyStatusHtml(item)}</div>
         </header>
         ${item.applyError ? `<div class="review-error-banner"><strong>Apply error</strong>${escape(item.applyError)}</div>` : ""}
         <form id="review-edit-form" class="submission-form">
@@ -270,6 +293,7 @@
           </div>
           <div class="review-action-bar">
             <span id="review-action-status" class="submission-status"></span>
+            ${retryApplyButton(item)}
             <label class="review-notification-toggle"><input id="review-send-notification" type="checkbox"${item.sendNotification ? " checked" : ""}> Send notification message after approval</label>
             <button type="button" class="secondary-action" data-review-action="save">Save Changes</button>
             <button type="button" class="review-needs-action" data-review-action="needs_changes">Needs Changes</button>
@@ -285,10 +309,10 @@
     const target = document.getElementById("review-center-content");
     if (!target) return;
     const visible = visibleRequests();
-    if (!state.selectedId || !state.requests.some(item => item.recordId === state.selectedId)) {
-      state.selectedId = visible[0]?.recordId || state.requests[0]?.recordId || "";
+    if (!state.selectedId || !visible.some(item => item.recordId === state.selectedId)) {
+      state.selectedId = visible[0]?.recordId || "";
     }
-    const selected = state.requests.find(item => item.recordId === state.selectedId) || null;
+    const selected = visible.find(item => item.recordId === state.selectedId) || null;
     target.className = "review-center";
     target.innerHTML = `${queueRowsHtml()}<main class="review-detail-shell">${detailHtml(selected)}</main>`;
     bindRenderedPage(selected);
@@ -331,6 +355,7 @@
       render();
     }));
     if (!selected) return;
+    document.querySelectorAll("[data-retry-apply]").forEach(button => button.addEventListener("click", () => retryApply(button.dataset.retryApply, button)));
     bindReviewWorkflow(selected);
     const proposedPreview = document.getElementById("review-proposed-guidance");
     const refreshProposedPreview = () => {
@@ -357,6 +382,27 @@
       if (list) list.innerHTML = files.map(file => `<span>${escape(file.name)} | ${Math.ceil(file.size / 1024)} KB</span>`).join("");
     });
     document.querySelectorAll("[data-review-action]").forEach(button => button.addEventListener("click", () => saveReview(button.dataset.reviewAction)));
+  }
+
+  async function retryApply(recordId, button) {
+    if (!window.confirm("Retry applying this approved submission now?")) return;
+    button.disabled = true;
+    try {
+      setStatus("Retrying the approved update...");
+      await request("/api/retry-approved-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recordId })
+      });
+      window.BOTSOP_DATA_CACHE?.clear?.();
+      setStatus("Applied successfully.", "success");
+      await loadRequests(true);
+    } catch (error) {
+      setStatus(error.message, "error");
+      await loadRequests(true);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function readFile(file) {

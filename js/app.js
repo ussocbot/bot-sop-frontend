@@ -69,8 +69,43 @@ window.appState = {
     return [...new Map((items || []).map(item => [item.id, item])).values()];
   }
 
-  function processAccordionList(items) {
-    return `<div class="process-list">${items.map(item => window.BOTSOP_UI.processAccordion(item, entryActionButtons(item))).join("")}</div>`;
+  function processAccordionList(items, layout = "default") {
+    return `<div class="process-list">${items.map(item => window.BOTSOP_UI.processAccordion(item, entryActionButtons(item), layout)).join("")}</div>`;
+  }
+
+  function groupedContentList(items, layout = "default") {
+    const groups = new Map();
+    const ungrouped = [];
+    items.forEach(item => {
+      const name = String(item.contentGroup || "").trim();
+      if (!name) {
+        ungrouped.push(item);
+        return;
+      }
+      const key = placementKey(name);
+      if (!groups.has(key)) groups.set(key, { name, items: [] });
+      groups.get(key).items.push(item);
+    });
+    const grouped = [...groups.values()].sort((a, b) => {
+      const firstA = Math.min(...a.items.map(item => item.sortOrder || 9999));
+      const firstB = Math.min(...b.items.map(item => item.sortOrder || 9999));
+      return firstA - firstB || a.name.localeCompare(b.name);
+    });
+    return `
+      <div class="content-group-list">
+        ${ungrouped.length ? processAccordionList(ungrouped, layout) : ""}
+        ${grouped.map(group => `
+          <details class="content-subgroup" data-accordion-group="content-subgroups">
+            <summary>
+              <span>${window.BOTSOP_UI.icon("folder-tree")}<strong>${window.BOTSOP_UI.escape(group.name)}</strong></span>
+              <small>${group.items.length} entr${group.items.length === 1 ? "y" : "ies"}</small>
+              ${window.BOTSOP_UI.icon("chevron-down", "content-subgroup__chevron")}
+            </summary>
+            <div class="content-subgroup__body">${processAccordionList(group.items, layout)}</div>
+          </details>
+        `).join("")}
+      </div>
+    `;
   }
 
   function remember(view, id, query = "") {
@@ -171,7 +206,7 @@ window.appState = {
       <div class="page-stack">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><span>OOS Routing</span></nav>
         <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon("route")}</span><div><h2>All OOS Routing</h2><p>${items.length} active destination${items.length === 1 ? "" : "s"}.</p></div></header>
-        <div class="process-grid">${items.map(window.BOTSOP_UI.processCard).join("")}</div>
+        ${items.length ? groupedContentList(items, "oos") : ""}
         ${!items.length ? `<section class="empty-state"><h2>No OOS destinations available</h2><p>Active OOS records will appear here.</p></section>` : ""}
       </div>
     `);
@@ -229,7 +264,7 @@ window.appState = {
           <span class="process-header__icon">${window.BOTSOP_UI.icon(requestType.icon || "folder")}</span>
           <div><p>Guidance Category</p><h1>${window.BOTSOP_UI.escape(requestType.title)}</h1><span>${window.BOTSOP_UI.escape(requestType.summary || requestType.description || "Operational guidance and workflows")}</span></div>
         </header>
-        ${allItems.length ? `<section class="process-group"><header><div><h2>${window.BOTSOP_UI.escape(requestType.title)} Guidance</h2><p>Expand an entry to view its complete guidance.</p></div></header>${processAccordionList(allItems)}</section>` : ""}
+        ${allItems.length ? `<section class="process-group"><header><div><h2>${window.BOTSOP_UI.escape(requestType.title)} Guidance</h2><p>Expand an entry or content group to view its complete guidance.</p></div></header>${groupedContentList(allItems)}</section>` : ""}
         ${!allItems.length ? `<section class="empty-state"><h2>No content mapped here</h2><p>Add <strong>${window.BOTSOP_UI.escape(requestType.title)}</strong> to a Content record's <strong>Appears In</strong> field.</p></section>` : ""}
       </div>
     `);
@@ -328,7 +363,7 @@ window.appState = {
     renderAndRefresh(`
       <div class="page-stack">
         <header class="section-title"><span class="section-title__icon">${window.BOTSOP_UI.icon("search")}</span><div><h2>${query ? "Search Results" : "Filtered Results"}</h2><p>${resultDescription}</p></div></header>
-        <div class="process-grid">${matches.map(window.BOTSOP_UI.processCard).join("")}</div>
+        ${matches.length ? groupedContentList(matches) : ""}
         ${!matches.length ? `<section class="empty-state"><h2>No matches found</h2><p>Try a different title, keyword, category, or resource name.</p></section>` : ""}
       </div>
     `);

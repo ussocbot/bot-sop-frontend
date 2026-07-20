@@ -314,7 +314,7 @@
     `;
   };
 
-  UI.processAccordion = function processAccordion(item, favoriteHtml = "") {
+  UI.processAccordion = function processAccordion(item, favoriteHtml = "", layout = "default") {
     const kind = item.sourceType === "Documentation" ? "Resource" : "SOP";
     const badge = UI.itemBadge(item);
     return `
@@ -328,7 +328,7 @@
           </span>
           ${UI.icon("chevron-down", "process-accordion__chevron")}
         </summary>
-        <div class="process-accordion__body">${UI.inlineContent(item, favoriteHtml)}</div>
+        <div class="process-accordion__body">${UI.inlineContent(item, favoriteHtml, layout)}</div>
       </details>
     `;
   };
@@ -389,11 +389,11 @@
     `;
   };
 
-  UI.relatedItemsSection = function relatedItemsSection(itemOrResources, legacyTasks) {
+  UI.relatedItemsSection = function relatedItemsSection(itemOrResources, legacyTasks, includeDirectLink = true) {
     const item = Array.isArray(itemOrResources)
       ? { relatedResources: itemOrResources, linkedTasks: legacyTasks || [] }
       : (itemOrResources || {});
-    const directLinks = item.url ? [{
+    const directLinks = includeDirectLink && item.url ? [{
       title: item.ctaLabel || "Open Resource",
       url: item.url,
       icon: "external-link",
@@ -435,6 +435,18 @@
     `;
   };
 
+  UI.primaryResourceLink = function primaryResourceLink(item) {
+    if (!item?.url) return "";
+    return `
+      <section class="oos-primary-resource">
+        <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
+          <span>${UI.icon("external-link")}<strong>${UI.escape(item.ctaLabel || "Open Resource")}</strong></span>
+          ${UI.icon("arrow-up-right")}
+        </a>
+      </section>
+    `;
+  };
+
   UI.imageGallery = function imageGallery(images) {
     if (!images?.length) return "";
     return `
@@ -458,21 +470,23 @@
     `;
   };
 
-  UI.inlineContent = function inlineContent(item, favoriteHtml = null) {
+  UI.inlineContent = function inlineContent(item, favoriteHtml = null, layout = "default") {
     const actionHtml = favoriteHtml === null ? (window.BOTSOP_ENTRY_ACTIONS?.(item) || "") : favoriteHtml;
     const hasContent = item.instruction || item.screenshotGuidance || item.screenshots?.length ||
       item.relatedResources?.length || item.linkedTasks?.length || item.closingGuidance ||
       item.ticketTagDisplay || item.url;
     if (!hasContent && !actionHtml) return `<p class="inline-content__empty">No guidance has been added yet.</p>`;
+    const oosLayout = layout === "oos";
     return `
       <div class="inline-content">
         ${actionHtml}
+        ${oosLayout ? UI.primaryResourceLink(item) : ""}
         ${UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
         ${UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
         ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
-        ${UI.relatedItemsSection(item)}
+        ${UI.relatedItemsSection(item, null, !oosLayout)}
       </div>
     `;
   };
