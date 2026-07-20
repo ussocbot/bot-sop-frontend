@@ -389,7 +389,7 @@
     button.disabled = true;
     try {
       setStatus("Retrying the approved update...");
-      await request("/api/retry-approved-update", {
+      await request("/api/apply-approved-update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recordId })
