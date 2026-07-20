@@ -230,9 +230,12 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .content-subgroup[open] .content-subgroup__chevron { transform: rotate(180deg); }
 .content-subgroup__body { padding: 0 0 14px; border-top: 1px solid #d8e3f0; background: #fff; }
 .oos-primary-resource { margin-bottom: 14px; }
-.oos-primary-resource a { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid #8db6e8; border-radius: 10px; color: #124f9e; text-decoration: none; background: linear-gradient(90deg, #eaf4ff, #f6faff); }
-.oos-primary-resource a:hover { border-color: #4d8ed8; background: #e3f1ff; }
+.oos-primary-resource__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; overflow: hidden; border: 1px solid #8db6e8; border-radius: 10px; background: linear-gradient(90deg, #eaf4ff, #f6faff); }
+.oos-primary-resource a { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; color: #124f9e; text-decoration: none; }
+.oos-primary-resource a:hover { background: #e3f1ff; }
 .oos-primary-resource a span { display: flex; align-items: center; gap: 9px; }
+.oos-primary-resource a strong { overflow: hidden; font-size: 15px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.oos-primary-resource .copy-link-button { min-width: 46px; border-left-color: #b7cee9; background: rgba(255,255,255,.78); }
 .record-page { padding: 20px; }
 .record-page > * + * { margin-top: 18px; }
 .record-meta { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -262,12 +265,11 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .detail-section--related .detail-link-row:last-child { margin-bottom: 0; }
 .closing-guidance-list { display: grid; gap: 6px; padding: 6px; }
 .closing-guidance-row { overflow: hidden; padding: 12px 14px; border: 1px solid #d5e2f2; border-radius: 7px; background: rgba(255,255,255,.92); }
-.closing-guidance-row > h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 8px; color: #23466f; font-size: 12px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
-.closing-guidance-row > h3 svg { width: 15px; height: 15px; }
 .closing-guidance-row > div { color: #263a52; font-size: 15px; line-height: 1.65; }
 .closing-guidance-row > div > :first-child { margin-top: 0; }
 .closing-guidance-row > div > :last-child { margin-bottom: 0; }
-.closing-guidance-row--tags > div { font-weight: 700; }
+.closing-guidance-row--tags { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 9px; align-items: start; border-top-color: #c7d7ea; }
+.closing-guidance-row--tags > svg { width: 16px; height: 16px; margin-top: 4px; color: #456b98; }
 .formatted-content .detail-section__body > :first-child, .expectation-item__body > :first-child { margin-top: 0; }
 .formatted-content .detail-section__body > :last-child, .expectation-item__body > :last-child { margin-bottom: 0; }
 .formatted-content h3, .formatted-content h4, .formatted-content h5, .expectation-item__body h3, .expectation-item__body h4, .expectation-item__body h5 { margin: 18px 0 7px; line-height: 1.3; }
@@ -550,12 +552,14 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 /* V17 unified content typography */
 .content .detail-section__body,
 .content .expectation-item__body,
+.content .closing-guidance-row > div,
+.content .detail-link-main,
 .content .current-guidance-preview,
 .submission-editor__preview,
 .review-current-card,
 #review-proposed-guidance {
   color: #334155;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
 }
 .content .detail-section__body p,
@@ -624,7 +628,7 @@ svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .detail-section--related .suggest-related-button svg { width: 14px; height: 14px; }
 .detail-section--related .detail-link-list { padding: 6px; }
 .detail-section--related .detail-link-row { margin-bottom: 4px; border-radius: 7px; }
-.content .detail-section--related .detail-link-main { gap: 7px; padding: 8px 10px; font-size: 13px; line-height: 1.35; }
+.content .detail-section--related .detail-link-main { gap: 7px; padding: 8px 10px; font-size: 15px; line-height: 1.6; }
 .detail-section--related .detail-link-main > span { gap: 7px; }
 .detail-section--related .detail-link-main svg { width: 15px; height: 15px; }
 .detail-section--related .copy-link-button { min-width: 36px; padding: 0 8px; }
