@@ -118,6 +118,29 @@
     `;
   };
 
+  UI.closingGuidanceSection = function closingGuidanceSection(closingGuidance, ticketTags) {
+    if (!closingGuidance && !ticketTags) return "";
+    return `
+      <section class="detail-section detail-section--related closing-guidance-panel">
+        <h2>${UI.icon("message-square-check")} Closing Guidance &amp; Ticket Tags</h2>
+        <div class="closing-guidance-list">
+          ${closingGuidance ? `
+            <section class="closing-guidance-row formatted-content">
+              <h3>${UI.icon("message-square-text")} Closing Guidance</h3>
+              <div>${UI.markdown(closingGuidance)}</div>
+            </section>
+          ` : ""}
+          ${ticketTags ? `
+            <section class="closing-guidance-row closing-guidance-row--tags">
+              <h3>${UI.icon("tags")} Ticket Tags</h3>
+              <div>${UI.textBlocks(ticketTags)}</div>
+            </section>
+          ` : ""}
+        </div>
+      </section>
+    `;
+  };
+
   UI.actionAttributes = function actionAttributes(item) {
     if ((item.isFeatured || ["Important News", "SOP Updates", "Macro Updates"].includes(item.displayType)) && item.id) {
       return `href="#" onclick="event.preventDefault(); showRecord('${UI.escape(item.id)}')"`;
@@ -481,8 +504,7 @@
         ${UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
         ${UI.imageGallery(item.screenshots)}
-        ${UI.markdownSection("Closing Guidance", "message-square-check", item.closingGuidance, "entry-priority-section")}
-        ${UI.detailSection("Ticket Tags", "tags", item.ticketTagDisplay, "entry-priority-section")}
+        ${UI.closingGuidanceSection(item.closingGuidance, item.ticketTagDisplay)}
         ${UI.relatedItemsSection(item, null, !oosLayout)}
       </div>
     `;
