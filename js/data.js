@@ -522,8 +522,8 @@ window.navigationItems = [];
     slugify
   };
 
-  const DATA_CACHE_KEY = "botsop:base-data:v18-8";
-  const DATA_CACHE_TTL = 8 * 60 * 60 * 1000;
+  const DATA_CACHE_KEY = "botsop:base-data:v18-10";
+  const DATA_CACHE_TTL = 24 * 60 * 60 * 1000;
 
   function installPayload(payload) {
     window.baseModel = buildModel(payload.records || [], payload.documentationRecords || []);
@@ -547,6 +547,14 @@ window.navigationItems = [];
       window.sessionStorage.setItem(DATA_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), payload }));
     } catch {
       // Storage may be unavailable in restricted browser contexts.
+    }
+  }
+
+  function payloadFingerprint(payload) {
+    try {
+      return JSON.stringify(payload || {});
+    } catch {
+      return "";
     }
   }
 
@@ -581,7 +589,19 @@ window.navigationItems = [];
   const cachedPayload = readCache();
   if (cachedPayload) {
     window.baseDataReady = Promise.resolve(installPayload(cachedPayload));
+    window.baseDataRefreshReady = fetchPayload()
+      .then(freshPayload => {
+        if (payloadFingerprint(freshPayload) === payloadFingerprint(cachedPayload)) return window.baseModel;
+        const model = installPayload(freshPayload);
+        window.dispatchEvent(new CustomEvent("botsop:data-updated", { detail: { model } }));
+        return model;
+      })
+      .catch(error => {
+        console.warn("BOT SOP background data refresh failed", error);
+        return window.baseModel;
+      });
   } else {
     window.baseDataReady = fetchPayload().then(installPayload);
+    window.baseDataRefreshReady = window.baseDataReady;
   }
 })();

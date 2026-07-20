@@ -345,10 +345,10 @@ window.appState = {
     if (toggle) toggle.classList.toggle("has-active-filters", count > 0);
   }
 
-  window.showSearch = function showSearch(rawQuery, addToHistory = true, restoreScroll = 0) {
+  window.showSearch = function showSearch(rawQuery, addToHistory = true, restoreScroll = 0, preserveInput = false) {
     const query = String(rawQuery || "").trim();
     const input = document.querySelector(".header-search input");
-    if (input && input.value !== query) input.value = query;
+    if (!preserveInput && input && input.value !== query) input.value = query;
     const filterCount = activeFilterCount();
     if (!query && !filterCount) return window.showHome(false);
     if (addToHistory && window.appState.currentView !== "search") remember("search", null, query);
@@ -525,7 +525,12 @@ window.appState = {
     if (!input) return;
     const replacement = input.cloneNode(true);
     input.replaceWith(replacement);
-    replacement.addEventListener("input", event => window.showSearch(event.target.value, window.appState.currentView !== "search"));
+    replacement.addEventListener("input", event => window.showSearch(
+      event.target.value,
+      window.appState.currentView !== "search",
+      0,
+      true
+    ));
   }
 
   function installAdvancedSearch() {
@@ -599,6 +604,38 @@ window.appState = {
   function showStartupError(error) {
     renderAndRefresh(`<section class="empty-state"><h1>Unable to load BOT SOP</h1><p>${window.BOTSOP_UI.escape(error.message || error)}</p><button type="button" class="primary-action" onclick="window.location.reload()">Try again</button></section>`);
   }
+
+  function renderCurrentViewAfterDataUpdate() {
+    window.buildLeftNavigation();
+    window.BOTSOP_UI.renderRightRail(window.baseModel);
+
+    const view = window.appState.currentView;
+    const id = window.appState.currentSection;
+    const query = window.appState.currentQuery;
+    const scrollY = window.scrollY || 0;
+
+    if (view === "section") {
+      if (window.baseModel.requestTypes.some(item => item.id === id || item.recordKey === id)) window.showSection(id, false);
+      else window.showHome(false);
+    } else if (view === "record") {
+      if (window.baseModel.find(id)) window.showRecord(id, false);
+      else window.showHome(false);
+    } else if (view === "search") {
+      window.showSearch(query, false, scrollY);
+    } else if (view === "favorites") {
+      window.showFavorites(false);
+    } else if (view === "updates") {
+      window.showUpdateArchive(id, false);
+    } else if (view === "oos") {
+      window.showOosRouting(false);
+    } else if (view === "home") {
+      window.showHome(false);
+    } else {
+      window.BOTSOP_UI.refreshIcons();
+    }
+  }
+
+  window.addEventListener("botsop:data-updated", renderCurrentViewAfterDataUpdate);
 
   async function initializeApp() {
     try {
