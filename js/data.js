@@ -197,6 +197,21 @@ window.navigationItems = [];
     return new Date(timestamp).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
+  function dateTimestamp(value) {
+    const raw = textValue(value);
+    if (!raw) return 0;
+    const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (dateOnly) return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])).getTime();
+    if (/^\d{10,13}$/.test(raw)) return raw.length === 10 ? Number(raw) * 1000 : Number(raw);
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function formattedDateOnlyValue(value) {
+    const timestamp = dateTimestamp(value);
+    return timestamp ? new Date(timestamp).toLocaleDateString([], { dateStyle: "medium" }) : textValue(value);
+  }
+
   function slugify(value) {
     return textValue(value)
       .toLowerCase()
@@ -285,11 +300,14 @@ window.navigationItems = [];
       status: textValue(findField(fields, ["Status"])),
       published: boolValue(findField(fields, ["Published"]), true),
       url: deepUrl(findField(fields, ["URL", "Link"])) || urlValue(findField(fields, ["URL", "Link"])),
-      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
+      ctaLabel: textValue(findField(fields, ["CTA Label"])),
       badge: textValue(findField(fields, ["Badge"])),
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
       featureSummary: textValue(findField(fields, ["Feature Summary"])),
       expirationDate: textValue(findField(fields, ["Expiration Date"])),
+      effectiveThroughRaw: textValue(findField(fields, ["Effective Through", "Effective Until"])),
+      effectiveThrough: formattedDateOnlyValue(findField(fields, ["Effective Through", "Effective Until"])),
+      effectiveThroughAt: dateTimestamp(findField(fields, ["Effective Through", "Effective Until"])),
       updateDateRaw: textValue(findField(fields, ["Update Date", "Last Updated"])),
       lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated"])) || "Not available",
       screenshotGuidance: guidanceAttachments.length ? "" : textValue(rawScreenshotGuidance),
@@ -334,7 +352,7 @@ window.navigationItems = [];
       description: summary,
       instruction: richTextValue(findField(fields, ["Guidance", "Instructions", "Instruction", "Content", "Details"])),
       url: deepUrl(findField(fields, ["URL", "Link", "Resource URL"])) || urlValue(findField(fields, ["URL", "Link", "Resource URL"])),
-      ctaLabel: textValue(findField(fields, ["CTA Label"])) || "Open Resource",
+      ctaLabel: textValue(findField(fields, ["CTA Label"])),
       iconKey: textValue(findField(fields, ["Icon Key", "Icon"])),
       badge: textValue(findField(fields, ["Badge"])),
       websitePlacements: listValue(findField(fields, ["Website Placement", "Website Placements"])),
@@ -346,6 +364,9 @@ window.navigationItems = [];
       updateDateRaw: textValue(findField(fields, ["Update Date", "Last Updated", "Updated"])),
       lastUpdated: formattedDateValue(findField(fields, ["Update Date", "Last Updated", "Updated"])) || "Not available",
       publishDate: textValue(findField(fields, ["Publish Date", "Published Date", "Date Published"])),
+      effectiveThroughRaw: textValue(findField(fields, ["Effective Through", "Effective Until"])),
+      effectiveThrough: formattedDateOnlyValue(findField(fields, ["Effective Through", "Effective Until"])),
+      effectiveThroughAt: dateTimestamp(findField(fields, ["Effective Through", "Effective Until"])),
       appearsIn: [],
       parents: [],
       parentIds: [],
@@ -374,9 +395,13 @@ window.navigationItems = [];
   function buildModel(records, documentationRecords = []) {
     const usedIds = new Set();
     const items = records.map((record, index) => mapRecord(record, index, usedIds));
-    const isActive = item => item.published && normalizeKey(item.status) === "active";
-    const publishedItems = items.filter(isActive);
-    const documents = documentationRecords.map(mapDocumentationRecord).filter(isActive);
+    const now = Date.now();
+    const isBaseActive = item => item.published && normalizeKey(item.status) === "active";
+    const isPastEffectiveThrough = item => item.effectiveThroughAt > 0 && now >= item.effectiveThroughAt;
+    const activeItems = items.filter(isBaseActive);
+    const publishedItems = activeItems.filter(item => !isPastEffectiveThrough(item));
+    const mappedDocuments = documentationRecords.map(mapDocumentationRecord);
+    const documents = mappedDocuments.filter(item => isBaseActive(item) && !isPastEffectiveThrough(item));
     const documentsByRecordId = new Map(documents.map(item => [item.recordId, item]));
     const itemsByRecordId = new Map(publishedItems.map(item => [item.recordId, item]));
 
@@ -402,20 +427,28 @@ window.navigationItems = [];
       item.resourceCount = item.relatedResources.length;
     });
     const requestTypes = buildRequestTypes(publishedItems);
-    publishedItems.forEach(item => {
+    activeItems.forEach(item => {
       item.mappingIssue = "";
-      if (!item.mappingValid) {
+      if (isPastEffectiveThrough(item)) {
+        item.mappingIssue = `Effective Through date reached (${item.effectiveThrough || item.effectiveThroughRaw}) — update Status to Inactive or remove the date`;
+      } else if (!item.mappingValid) {
         item.mappingIssue = item.displayType
           ? `Unknown Display Type: ${item.displayType}`
           : "Display Type is blank";
       }
     });
 
+    const futureEffectiveDates = [...activeItems, ...mappedDocuments.filter(isBaseActive)]
+      .map(item => item.effectiveThroughAt)
+      .filter(timestamp => timestamp > now)
+      .sort((a, b) => a - b);
+
     return {
       items: publishedItems,
       documents,
       requestTypes,
-      unmapped: publishedItems.filter(item => item.mappingIssue),
+      unmapped: activeItems.filter(item => item.mappingIssue),
+      nextEffectiveChangeAt: futureEffectiveDates[0] || 0,
       section(displayType) {
         return publishedItems
           .filter(item => item.displayType === displayType)
@@ -524,11 +557,25 @@ window.navigationItems = [];
 
   const DATA_CACHE_KEY = "botsop:base-data:v18-10";
   const DATA_CACHE_TTL = 24 * 60 * 60 * 1000;
+  let effectiveChangeTimer = 0;
+
+  function scheduleEffectiveChange(payload, model) {
+    if (effectiveChangeTimer) window.clearTimeout(effectiveChangeTimer);
+    effectiveChangeTimer = 0;
+    if (!model?.nextEffectiveChangeAt) return;
+    const maximumDelay = 2147483000;
+    const delay = Math.max(1000, Math.min(maximumDelay, model.nextEffectiveChangeAt - Date.now() + 1000));
+    effectiveChangeTimer = window.setTimeout(() => {
+      const refreshedModel = installPayload(payload);
+      window.dispatchEvent(new CustomEvent("botsop:data-updated", { detail: { model: refreshedModel, reason: "effective-through" } }));
+    }, delay);
+  }
 
   function installPayload(payload) {
     window.baseModel = buildModel(payload.records || [], payload.documentationRecords || []);
     window.navigationItems = [...window.baseModel.requestTypes, ...window.baseModel.items];
     window.baseMeta = payload.meta || {};
+    scheduleEffectiveChange(payload, window.baseModel);
     return window.baseModel;
   }
 

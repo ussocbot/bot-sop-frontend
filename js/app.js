@@ -169,8 +169,6 @@ window.appState = {
     const searchInput = document.querySelector(".header-search input");
     if (searchInput) searchInput.value = "";
 
-    const expectations = guidanceItemsFor("BOT Expectations");
-    const usdsCompliance = guidanceItemsFor("USDS JV Compliance");
     const outOfScope = uniqueItems([
       ...guidanceItemsFor("Out of Scope"),
       ...model.documentsFor("OOS Routing")
@@ -182,8 +180,6 @@ window.appState = {
       <div class="page-stack">
         ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
         ${window.BOTSOP_UI.updatesCallout(window.baseMeta?.unacknowledgedUpdatesUrl)}
-        ${window.BOTSOP_UI.guidanceDropdownSection("USDS JV Compliance", "shield-check", usdsCompliance, "red", "Privacy, disclosure, and USDS JV handling requirements.")}
-        ${window.BOTSOP_UI.expectationsSection(expectations, "Required standards and responsibilities for every ticket.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Out of Scope", "route", outOfScope, "blue", "Routing guidance for work that falls outside BOT scope.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Ban Operators and Reasons", "shield-check", banOperatorsAndReasons, "orange", "Guidance for selecting ban operators and reason codes.")}
         ${window.BOTSOP_UI.warningCards(warnings)}
@@ -291,6 +287,7 @@ window.appState = {
     const meta = [
       item.status && `<span>${window.BOTSOP_UI.icon("circle-dot")} ${window.BOTSOP_UI.escape(item.status)}</span>`,
       item.lastUpdated && `<span>${window.BOTSOP_UI.icon("calendar-clock")} Updated ${window.BOTSOP_UI.escape(item.lastUpdated)}</span>`,
+      item.effectiveThrough && `<span class="effective-through-meta">${window.BOTSOP_UI.icon("calendar-x-2")} Effective through ${window.BOTSOP_UI.escape(item.effectiveThrough)}</span>`,
       item.displayType && `<span>${window.BOTSOP_UI.icon("layout-template")} ${window.BOTSOP_UI.escape(item.displayType)}</span>`,
       favoriteButton(item, true),
       sendToMeButton(item),
@@ -319,6 +316,135 @@ window.appState = {
     `);
   };
 
+  function backupEntry(item) {
+    const relatedResources = (item.relatedResources || []).filter(entry => entry?.url);
+    const linkedTasks = (item.linkedTasks || []).filter(entry => entry?.title && !entry.unresolved);
+    const resourceName = String(item.ctaLabel || "").trim().toLowerCase() === "open resource"
+      ? item.title
+      : (item.ctaLabel || item.title || item.url);
+    return `
+      <section class="backup-entry">
+        <h3>${window.BOTSOP_UI.escape(item.title)}</h3>
+        <div class="backup-entry__meta">
+          ${item.displayType ? `<span>${window.BOTSOP_UI.escape(item.displayType)}</span>` : ""}
+          ${item.lastUpdated ? `<span>Updated ${window.BOTSOP_UI.escape(item.lastUpdated)}</span>` : ""}
+          ${item.effectiveThrough ? `<span>Effective through ${window.BOTSOP_UI.escape(item.effectiveThrough)}</span>` : ""}
+        </div>
+        ${item.summary ? `<p class="backup-entry__summary">${window.BOTSOP_UI.escape(item.summary)}</p>` : ""}
+        ${item.instruction ? `<div class="backup-entry__guidance formatted-content">${window.BOTSOP_UI.markdown(item.instruction)}</div>` : ""}
+        ${item.url ? `<p class="backup-entry__resource"><strong>${window.BOTSOP_UI.escape(resourceName || item.url)}</strong><br><a href="${window.BOTSOP_UI.escape(item.url)}">${window.BOTSOP_UI.escape(item.url)}</a></p>` : ""}
+        ${item.closingGuidance ? `<div class="backup-entry__closing formatted-content"><strong>Closing Guidance</strong>${window.BOTSOP_UI.markdown(item.closingGuidance)}</div>` : ""}
+        ${item.ticketTagDisplay ? `<p class="backup-entry__tags"><strong>Ticket Tags</strong><br>${window.BOTSOP_UI.escape(item.ticketTagDisplay)}</p>` : ""}
+        ${relatedResources.length ? `<div class="backup-entry__related"><strong>Related Resources</strong><ul>${relatedResources.map(entry => `<li><a href="${window.BOTSOP_UI.escape(entry.url)}">${window.BOTSOP_UI.escape(entry.title || entry.url)}</a> — ${window.BOTSOP_UI.escape(entry.url)}</li>`).join("")}</ul></div>` : ""}
+        ${linkedTasks.length ? `<div class="backup-entry__related"><strong>Related Tasks</strong><ul>${linkedTasks.map(entry => `<li>${window.BOTSOP_UI.escape(entry.title)}</li>`).join("")}</ul></div>` : ""}
+        ${(item.screenshots || []).length ? `<div class="backup-entry__images">${item.screenshots.map(image => `<figure><img src="${window.BOTSOP_UI.escape(image.src)}" alt="${window.BOTSOP_UI.escape(image.name)}"><figcaption>${window.BOTSOP_UI.escape(image.name)}</figcaption></figure>`).join("")}</div>` : ""}
+      </section>
+    `;
+  }
+
+  function backupSection(title, items, summary = "") {
+    if (!items.length) return "";
+    return `
+      <section class="backup-section">
+        <h2>${window.BOTSOP_UI.escape(title)}</h2>
+        ${summary ? `<p class="backup-section__summary">${window.BOTSOP_UI.escape(summary)}</p>` : ""}
+        ${items.map(backupEntry).join("")}
+      </section>
+    `;
+  }
+
+  function buildBackupDocument() {
+    const model = window.baseModel;
+    const sections = [];
+    const categorizedContentIds = new Set();
+
+    model.requestTypes.forEach(category => {
+      const items = model.processesFor(category.title);
+      items.forEach(item => categorizedContentIds.add(item.id));
+      sections.push(backupSection(category.title, items, category.summary || category.description));
+    });
+
+    const unassignedContent = model.section("Content").filter(item => !categorizedContentIds.has(item.id));
+    sections.push(backupSection("Unassigned Content", unassignedContent, "Active Content records that are not currently assigned to a Left Nav category."));
+
+    [
+      ["BOT Expectations", "BOT Expectations"],
+      ["USDS JV Compliance", "USDS JV Compliance"],
+      ["Out of Scope", "Out of Scope"],
+      ["Ban Operators and Reasons", "Ban Operators"],
+      ["Important News", "Important News"],
+      ["SOP Updates", "SOP Updates"],
+      ["Macro Updates", "Macro Updates"],
+      ["BOT Tools", "BOT Tools"],
+      ["Team Links", "Team Links"],
+      ["OPUS Links", "OPUS Links"],
+      ["QA Links", "QA Links"],
+      ["Warnings and Policy Reminders", "Warning"]
+    ].forEach(([title, displayType]) => sections.push(backupSection(title, model.section(displayType))));
+
+    sections.push(backupSection("Resource Hub", model.documents));
+
+    const uniqueRecords = new Set([
+      ...model.items.filter(item => item.displayType !== "Left Nav").map(item => item.id),
+      ...model.documents.map(item => item.id)
+    ]);
+    const generatedAt = new Date().toLocaleString([], { dateStyle: "long", timeStyle: "short" });
+    return `
+      <article class="backup-document" id="backup-document">
+        <header class="backup-document__cover">
+          <span class="backup-document__mark">BOT SOP</span>
+          <h1>Operational Guidance Backup</h1>
+          <p>Generated from the current active Feishu Base guidance.</p>
+          <dl><div><dt>Generated</dt><dd>${window.BOTSOP_UI.escape(generatedAt)}</dd></div><div><dt>Active records</dt><dd>${uniqueRecords.size}</dd></div><div><dt>Left Nav categories</dt><dd>${model.requestTypes.length}</dd></div></dl>
+        </header>
+        ${sections.filter(Boolean).join("")}
+      </article>
+    `;
+  }
+
+  window.showBackupDocument = function showBackupDocument(addToHistory = true) {
+    if (!window.baseModel) return;
+    if (addToHistory) remember("backup", "backup-document");
+    else {
+      window.appState.currentView = "backup";
+      window.appState.currentSection = "backup-document";
+      window.appState.currentQuery = "";
+    }
+    window.setActiveNavigation(null);
+    renderAndRefresh(`
+      <div class="backup-page">
+        <nav class="breadcrumbs backup-page__breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Backup Document</span></nav>
+        <div class="backup-page__toolbar">
+          <div><h2>Current Backup Document</h2><p>This copy is rebuilt from active Base guidance whenever it is opened or Base data changes.</p></div>
+          <button type="button" class="secondary-action" onclick="downloadBackupDocument()">${window.BOTSOP_UI.icon("download")} Download Copy</button>
+          <button type="button" class="primary-action" onclick="window.print()">${window.BOTSOP_UI.icon("printer")} Print / Save PDF</button>
+        </div>
+        ${buildBackupDocument()}
+      </div>
+    `);
+  };
+
+  window.downloadBackupDocument = function downloadBackupDocument() {
+    const source = document.getElementById("backup-document");
+    if (!source) return;
+    const copy = source.cloneNode(true);
+    const sourceImages = source.querySelectorAll("img");
+    copy.querySelectorAll("img").forEach((image, index) => {
+      if (sourceImages[index]?.src) image.src = sourceImages[index].src;
+    });
+    const exportStyles = `body{margin:0;padding:36px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{max-width:900px;margin:auto}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-section{margin-top:30px}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:avoid;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}</style></head><body>${copy.outerHTML}</body></html>`;
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `BOT-SOP-Backup-${new Date().toISOString().slice(0, 10)}.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   window.goBack = function goBack() {
     const prior = window.appState.history.pop();
     if (!prior || prior.view === "home") return window.showHome(false);
@@ -327,6 +453,7 @@ window.appState = {
     if (prior.view === "favorites") return window.showFavorites(false);
     if (prior.view === "updates") return window.showUpdateArchive(prior.id, false);
     if (prior.view === "oos") return window.showOosRouting(false);
+    if (prior.view === "backup") return window.showBackupDocument(false);
     return window.showRecord(prior.id, false);
   };
 
@@ -628,6 +755,8 @@ window.appState = {
       window.showUpdateArchive(id, false);
     } else if (view === "oos") {
       window.showOosRouting(false);
+    } else if (view === "backup") {
+      window.showBackupDocument(false);
     } else if (view === "home") {
       window.showHome(false);
     } else {
@@ -669,7 +798,9 @@ window.appState = {
       }
       const requestedPage = new URLSearchParams(window.location.search).get("page");
       const requestedRecord = new URLSearchParams(window.location.search).get("record");
-      if (requestedPage === "submit" && window.BOTSOP_SUBMISSIONS?.showSubmissionCenter) {
+      if (requestedPage === "backup") {
+        window.showBackupDocument(false);
+      } else if (requestedPage === "submit" && window.BOTSOP_SUBMISSIONS?.showSubmissionCenter) {
         window.BOTSOP_SUBMISSIONS.showSubmissionCenter();
       } else if (requestedRecord && window.baseModel.find(requestedRecord)) window.showRecord(requestedRecord, false);
       else window.showHome(false);

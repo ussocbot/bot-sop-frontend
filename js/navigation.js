@@ -13,16 +13,20 @@
     const markedQuickAccess = allOosRoutes.filter(item => item.quickAccess);
     const quickAccessRoutes = (markedQuickAccess.length ? markedQuickAccess : allOosRoutes).slice(0, 6);
     const visibleRequestTypes = model.requestTypes;
+    const priorityRequestTypes = visibleRequestTypes.slice(0, 5);
+    const remainingRequestTypes = visibleRequestTypes.slice(5);
+    const navItem = item => `
+      <button type="button" class="nav-item" data-section-id="${window.BOTSOP_UI.escape(item.id)}" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
+        ${window.BOTSOP_UI.icon(item.icon || "folder")}
+        <span>${item.specialType ? `${window.BOTSOP_UI.icon("star", "special-request-icon")} ` : ""}${window.BOTSOP_UI.escape(item.title)}</span>
+        ${window.BOTSOP_UI.icon("chevron-right")}
+      </button>
+    `;
     nav.innerHTML = `
       <div class="nav-block">
         <p class="nav-label">Guidance</p>
-        ${visibleRequestTypes.map(item => `
-          <button type="button" class="nav-item" data-section-id="${window.BOTSOP_UI.escape(item.id)}" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
-            ${window.BOTSOP_UI.icon(item.icon || "folder")}
-            <span>${item.specialType ? `${window.BOTSOP_UI.icon("star", "special-request-icon")} ` : ""}${window.BOTSOP_UI.escape(item.title)}</span>
-            ${window.BOTSOP_UI.icon("chevron-right")}
-          </button>
-        `).join("")}
+        ${priorityRequestTypes.length ? `<div class="nav-priority-group">${priorityRequestTypes.map(navItem).join("")}</div>` : ""}
+        ${remainingRequestTypes.length ? `<p class="nav-label nav-label--request-types">Request Types</p>${remainingRequestTypes.map(navItem).join("")}` : ""}
       </div>
       ${window.baseMeta?.favoritesEnabled ? `
         <div class="nav-block personal-nav">

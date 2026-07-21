@@ -735,7 +735,7 @@
     target.innerHTML = `
       <div class="submission-page">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Submission Center</span></nav>
-        <header class="submission-hero"><span class="submission-hero__icon">${UI().icon("file-plus-2")}</span><div><h1>Submission Center</h1><p>Submit formatted resources, SOP changes, Important News, and Macro Updates for review.</p></div></header>
+        <header class="submission-hero"><span class="submission-hero__icon">${UI().icon("file-plus-2")}</span><div><h1>Submission Center</h1><p>Submit formatted resources, SOP changes, Important News, and Macro Updates for review.</p><button type="button" class="submission-backup-link" onclick="showBackupDocument()">${UI().icon("files")} Open Backup Document</button></div></header>
         ${tabs.length > 1 ? `<div class="submission-tabs">${tabs.join("")}</div>` : ""}
         ${resourceAllowed ? resourceFormHtml() : ""}
         ${updateAllowed ? updateFormHtml() : ""}

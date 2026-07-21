@@ -310,8 +310,8 @@
     if (!items.length) return "";
     return `
       <details class="mapping-alert">
-        <summary>${UI.icon("triangle-alert")} ${items.length} published record${items.length === 1 ? "" : "s"} need mapping</summary>
-        <p>These records have a blank or unrecognized Display Type.</p>
+        <summary>${UI.icon("triangle-alert")} ${items.length} Base record${items.length === 1 ? "" : "s"} need attention</summary>
+        <p>Resolve expired guidance or correct a blank or unrecognized Display Type.</p>
         <ul>${items.map(item => `<li><strong>${UI.escape(item.title)}</strong>: ${UI.escape(item.mappingIssue || item.displayType || "Display Type is blank")}</li>`).join("")}</ul>
       </details>
     `;
@@ -405,8 +405,12 @@
     const item = Array.isArray(itemOrResources)
       ? { relatedResources: itemOrResources, linkedTasks: legacyTasks || [] }
       : (itemOrResources || {});
+    const requestedLabel = String(item.ctaLabel || "").trim();
+    const directLabel = requestedLabel && requestedLabel.toLowerCase() !== "open resource"
+      ? requestedLabel
+      : String(item.title || item.url || "").trim();
     const directLinks = includeDirectLink && item.url ? [{
-      title: item.ctaLabel || "Open Resource",
+      title: directLabel || item.url,
       url: item.url,
       icon: "external-link",
       kind: "Content link",
@@ -420,14 +424,15 @@
     return `
       <section class="detail-section detail-section--related">
         <h2>${UI.icon("link-2")} Related Resources &amp; Tasks</h2>
-        ${item.recordId ? `<button type="button" class="suggest-related-button" onclick="openRelatedSuggestion('${UI.escape(item.id)}')">${UI.icon("message-square-plus")} Suggest a Related Resource or Task</button>` : ""}
         <div class="detail-link-list">
           ${resourceRows.map(entry => {
             const badge = UI.itemBadge(entry);
+            const rawTitle = String(entry.title || "").trim();
+            const displayTitle = !rawTitle || rawTitle.toLowerCase() === "open resource" ? entry.url : rawTitle;
             return `
             <div class="detail-link-row">
               <a class="detail-link-main" href="${UI.escape(entry.url)}" target="_blank" rel="noopener noreferrer">
-                <span>${UI.icon(entry.icon || "book-open")}<strong>${UI.escape(entry.title)}${badge ? `<em class="entry-new-badge">${UI.escape(badge)}</em>` : ""}</strong><small class="link-kind">${UI.escape(entry.kind || "Resource")}</small></span>${UI.icon("arrow-up-right")}
+                <span>${UI.icon(entry.icon || "book-open")}<span class="detail-link-copy"><strong>${UI.escape(displayTitle)}${badge ? `<em class="entry-new-badge">${UI.escape(badge)}</em>` : ""}</strong><small class="detail-link-url">${UI.escape(entry.url)}</small></span><small class="link-kind">${UI.escape(entry.kind || "Resource")}</small></span>${UI.icon("arrow-up-right")}
               </a>
               <button type="button" class="copy-link-button" data-copy-url="${UI.escape(entry.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy link to ${UI.escape(entry.title)}" title="Copy link">${UI.icon("copy")}</button>
             </div>
@@ -443,17 +448,19 @@
             </div>
           `; }).join("")}
         </div>
+        ${item.recordId ? `<button type="button" class="suggest-related-button" onclick="openRelatedSuggestion('${UI.escape(item.id)}')">${UI.icon("message-square-plus")} Suggest a Related Resource or Task</button>` : ""}
       </section>
     `;
   };
 
   UI.primaryResourceLink = function primaryResourceLink(item) {
     if (!item?.url) return "";
+    const title = String(item.title || "").trim();
     return `
       <section class="oos-primary-resource">
         <div class="oos-primary-resource__row">
           <a href="${UI.escape(item.url)}" target="_blank" rel="noopener noreferrer">
-            <span>${UI.icon("external-link")}<strong>${UI.escape(item.url)}</strong></span>
+            <span>${UI.icon("external-link")}<span class="oos-primary-resource__copy">${title ? `<strong>${UI.escape(title)}</strong>` : ""}<small>${UI.escape(item.url)}</small></span></span>
             ${UI.icon("arrow-up-right")}
           </a>
           <button type="button" class="copy-link-button" data-copy-url="${UI.escape(item.url)}" onclick="copyRelatedLink(this.dataset.copyUrl, this)" aria-label="Copy OOS resource link" title="Copy link">${UI.icon("copy")}</button>
@@ -495,6 +502,7 @@
     return `
       <div class="inline-content">
         ${actionHtml}
+        ${item.effectiveThrough ? `<div class="inline-effective-through">${UI.icon("calendar-x-2")}<span>Effective through <strong>${UI.escape(item.effectiveThrough)}</strong></span></div>` : ""}
         ${oosLayout ? UI.primaryResourceLink(item) : ""}
         ${UI.markdownSection("Guidance", "clipboard-list", item.instruction)}
         ${UI.detailSection("Screenshot Guidance", "image", item.screenshotGuidance)}
