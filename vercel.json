@@ -10,6 +10,7 @@
     { "source": "/api/submission-upload", "destination": "/api/submission-center?action=upload" },
     { "source": "/api/submissions", "destination": "/api/submission-center?action=submit" },
     { "source": "/api/review-requests", "destination": "/api/submission-center?action=reviews" },
-    { "source": "/api/apply-approved-update", "destination": "/api/submission-center?action=apply" }
+    { "source": "/api/apply-approved-update", "destination": "/api/submission-center?action=apply" },
+    { "source": "/backup", "destination": "/?page=backup&standalone=1" }
   ]
 }
