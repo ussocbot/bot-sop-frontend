@@ -335,17 +335,17 @@ window.appState = {
         ${item.url ? `<p class="backup-entry__resource"><strong>${window.BOTSOP_UI.escape(resourceName || item.url)}</strong><br><a href="${window.BOTSOP_UI.escape(item.url)}">${window.BOTSOP_UI.escape(item.url)}</a></p>` : ""}
         ${item.closingGuidance ? `<div class="backup-entry__closing formatted-content"><strong>Closing Guidance</strong>${window.BOTSOP_UI.markdown(item.closingGuidance)}</div>` : ""}
         ${item.ticketTagDisplay ? `<p class="backup-entry__tags"><strong>Ticket Tags</strong><br>${window.BOTSOP_UI.escape(item.ticketTagDisplay)}</p>` : ""}
-        ${relatedResources.length ? `<div class="backup-entry__related"><strong>Related Resources</strong><ul>${relatedResources.map(entry => `<li><a href="${window.BOTSOP_UI.escape(entry.url)}">${window.BOTSOP_UI.escape(entry.title || entry.url)}</a> — ${window.BOTSOP_UI.escape(entry.url)}</li>`).join("")}</ul></div>` : ""}
+        ${relatedResources.length ? `<div class="backup-entry__related"><strong>Related Resources</strong><ul>${relatedResources.map(entry => `<li><strong>${window.BOTSOP_UI.escape(entry.title || entry.url)}</strong><br><a href="${window.BOTSOP_UI.escape(entry.url)}">${window.BOTSOP_UI.escape(entry.url)}</a></li>`).join("")}</ul></div>` : ""}
         ${linkedTasks.length ? `<div class="backup-entry__related"><strong>Related Tasks</strong><ul>${linkedTasks.map(entry => `<li>${window.BOTSOP_UI.escape(entry.title)}</li>`).join("")}</ul></div>` : ""}
         ${(item.screenshots || []).length ? `<div class="backup-entry__images">${item.screenshots.map(image => `<figure><img src="${window.BOTSOP_UI.escape(image.src)}" alt="${window.BOTSOP_UI.escape(image.name)}"><figcaption>${window.BOTSOP_UI.escape(image.name)}</figcaption></figure>`).join("")}</div>` : ""}
       </section>
     `;
   }
 
-  function backupSection(title, items, summary = "") {
+  function backupSection(id, title, items, summary = "") {
     if (!items.length) return "";
     return `
-      <section class="backup-section">
+      <section class="backup-section backup-document__panel" id="backup-${window.BOTSOP_UI.escape(id)}" data-backup-section="${window.BOTSOP_UI.escape(id)}" hidden>
         <h2>${window.BOTSOP_UI.escape(title)}</h2>
         ${summary ? `<p class="backup-section__summary">${window.BOTSOP_UI.escape(summary)}</p>` : ""}
         ${items.map(backupEntry).join("")}
@@ -353,19 +353,20 @@ window.appState = {
     `;
   }
 
-  function buildBackupDocument() {
+  function backupSectionDefinitions() {
     const model = window.baseModel;
     const sections = [];
-    const categorizedContentIds = new Set();
 
     model.requestTypes.forEach(category => {
       const items = model.processesFor(category.title);
-      items.forEach(item => categorizedContentIds.add(item.id));
-      sections.push(backupSection(category.title, items, category.summary || category.description));
+      if (!items.length) return;
+      sections.push({
+        id: `request-${category.id}`,
+        title: category.title,
+        summary: category.summary || category.description || "Active operational guidance.",
+        items
+      });
     });
-
-    const unassignedContent = model.section("Content").filter(item => !categorizedContentIds.has(item.id));
-    sections.push(backupSection("Unassigned Content", unassignedContent, "Active Content records that are not currently assigned to a Left Nav category."));
 
     [
       ["BOT Expectations", "BOT Expectations"],
@@ -380,27 +381,75 @@ window.appState = {
       ["OPUS Links", "OPUS Links"],
       ["QA Links", "QA Links"],
       ["Warnings and Policy Reminders", "Warning"]
-    ].forEach(([title, displayType]) => sections.push(backupSection(title, model.section(displayType))));
+    ].forEach(([title, displayType]) => {
+      const items = model.section(displayType);
+      if (!items.length) return;
+      sections.push({
+        id: `section-${displayType.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+        title,
+        summary: "Current active guidance.",
+        items
+      });
+    });
 
-    sections.push(backupSection("Resource Hub", model.documents));
+    return sections;
+  }
 
-    const uniqueRecords = new Set([
-      ...model.items.filter(item => item.displayType !== "Left Nav").map(item => item.id),
-      ...model.documents.map(item => item.id)
-    ]);
+  function buildBackupDocument() {
+    const sections = backupSectionDefinitions();
+    const includedItems = sections.flatMap(section => section.items);
+    const linkedResources = new Map();
+    includedItems.forEach(item => {
+      (item.relatedResources || []).forEach(resource => {
+        if (!resource?.url || resource.unresolved) return;
+        linkedResources.set(resource.recordId || resource.id || resource.url, resource);
+      });
+    });
+
     const generatedAt = new Date().toLocaleString([], { dateStyle: "long", timeStyle: "short" });
+    const navItems = [
+      { id: "overview", title: "Overview", count: includedItems.length },
+      ...sections.map(section => ({ id: section.id, title: section.title, count: section.items.length }))
+    ];
     return `
       <article class="backup-document" id="backup-document">
-        <header class="backup-document__cover">
-          <span class="backup-document__mark">BOT SOP</span>
-          <h1>Operational Guidance Backup</h1>
-          <p>Generated from the current active Feishu Base guidance.</p>
-          <dl><div><dt>Generated</dt><dd>${window.BOTSOP_UI.escape(generatedAt)}</dd></div><div><dt>Active records</dt><dd>${uniqueRecords.size}</dd></div><div><dt>Left Nav categories</dt><dd>${model.requestTypes.length}</dd></div></dl>
-        </header>
-        ${sections.filter(Boolean).join("")}
+        <aside class="backup-document__nav" aria-label="Backup document sections">
+          <span class="backup-document__nav-label">Current Guidance</span>
+          ${navItems.map((item, index) => `
+            <a href="#backup-${window.BOTSOP_UI.escape(item.id)}" data-backup-nav="${window.BOTSOP_UI.escape(item.id)}" aria-current="${index === 0 ? "page" : "false"}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(item.id)}')}">
+              <span>${window.BOTSOP_UI.escape(item.title)}</span><small>${item.count}</small>
+            </a>
+          `).join("")}
+        </aside>
+        <div class="backup-document__content">
+          <header class="backup-document__cover backup-document__panel" id="backup-overview" data-backup-section="overview">
+            <span class="backup-document__mark">BOT SOP</span>
+            <h1>Current Operational Guidance</h1>
+            <p>A focused copy containing only active guidance and the Resource Hub items linked directly to it.</p>
+            <dl><div><dt>Generated</dt><dd>${window.BOTSOP_UI.escape(generatedAt)}</dd></div><div><dt>Active guidance</dt><dd>${includedItems.length}</dd></div><div><dt>Linked resources</dt><dd>${linkedResources.size}</dd></div><div><dt>Sections</dt><dd>${sections.length}</dd></div></dl>
+            <div class="backup-overview-list">
+              ${sections.map(section => `<a href="#backup-${window.BOTSOP_UI.escape(section.id)}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(section.id)}')}"><span>${window.BOTSOP_UI.escape(section.title)}</span><strong>${section.items.length}</strong></a>`).join("")}
+            </div>
+          </header>
+          ${sections.map(section => backupSection(section.id, section.title, section.items, section.summary)).join("")}
+        </div>
       </article>
     `;
   }
+
+  window.showBackupSection = function showBackupSection(event, sectionId) {
+    if (event?.preventDefault) event.preventDefault();
+    const documentRoot = document.getElementById("backup-document");
+    if (!documentRoot) return false;
+    documentRoot.querySelectorAll("[data-backup-section]").forEach(section => {
+      section.hidden = section.dataset.backupSection !== sectionId;
+    });
+    documentRoot.querySelectorAll("[data-backup-nav]").forEach(link => {
+      link.setAttribute("aria-current", link.dataset.backupNav === sectionId ? "page" : "false");
+    });
+    documentRoot.scrollIntoView({ block: "start", behavior: "smooth" });
+    return false;
+  };
 
   window.showBackupDocument = function showBackupDocument(addToHistory = true) {
     if (!window.baseModel) return;
@@ -415,7 +464,7 @@ window.appState = {
       <div class="backup-page">
         <nav class="breadcrumbs backup-page__breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Backup Document</span></nav>
         <div class="backup-page__toolbar">
-          <div><h2>Current Backup Document</h2><p>This copy is rebuilt from active Base guidance whenever it is opened or Base data changes.</p></div>
+          <div><h2>Current Guidance Document</h2><p>Active guidance only. Resource Hub records appear only when linked to included content.</p></div>
           <button type="button" class="secondary-action" onclick="downloadBackupDocument()">${window.BOTSOP_UI.icon("download")} Download Copy</button>
           <button type="button" class="primary-action" onclick="window.print()">${window.BOTSOP_UI.icon("printer")} Print / Save PDF</button>
         </div>
@@ -428,11 +477,13 @@ window.appState = {
     const source = document.getElementById("backup-document");
     if (!source) return;
     const copy = source.cloneNode(true);
+    copy.querySelectorAll("[data-backup-section]").forEach(section => { section.hidden = false; });
+    copy.querySelectorAll("[data-backup-nav]").forEach(link => link.removeAttribute("aria-current"));
     const sourceImages = source.querySelectorAll("img");
     copy.querySelectorAll("img").forEach((image, index) => {
       if (sourceImages[index]?.src) image.src = sourceImages[index].src;
     });
-    const exportStyles = `body{margin:0;padding:36px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{max-width:900px;margin:auto}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-section{margin-top:30px}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:avoid;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}`;
+    const exportStyles = `html{scroll-behavior:smooth}body{margin:0;padding:28px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{display:grid;grid-template-columns:210px minmax(0,900px);gap:28px;max-width:1140px;margin:auto}.backup-document__nav{position:sticky;top:20px;align-self:start;display:grid;gap:4px;padding-right:18px;border-right:1px solid #d9e1ec}.backup-document__nav-label{font-size:8pt;font-weight:800;text-transform:uppercase}.backup-document__nav a{display:flex;justify-content:space-between;gap:10px;padding:7px 8px;color:#173e70;text-decoration:none}.backup-document__content{min-width:0}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;flex-wrap:wrap;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-overview-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:24px}.backup-overview-list a{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #d9e1ec;text-decoration:none}.backup-section{margin-top:30px}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:avoid;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}@media print{body{padding:0}.backup-document{display:block;max-width:none}.backup-document__nav{display:none}.backup-section{break-before:page}}@media(max-width:720px){.backup-document{grid-template-columns:1fr}.backup-document__nav{position:static;border-right:0;border-bottom:1px solid #d9e1ec;padding:0 0 14px}.backup-overview-list{grid-template-columns:1fr}}`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}</style></head><body>${copy.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
