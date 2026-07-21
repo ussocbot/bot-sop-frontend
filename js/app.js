@@ -15,6 +15,12 @@ window.appState = {
     return document.getElementById("content-view");
   }
 
+  function isStandaloneBackup() {
+    const path = window.location.pathname.replace(/\/+$/, "") || "/";
+    const params = new URLSearchParams(window.location.search);
+    return path === "/backup" || (params.get("page") === "backup" && params.get("standalone") === "1");
+  }
+
   function renderAndRefresh(html) {
     const target = contentView();
     if (!target) return;
@@ -154,6 +160,40 @@ window.appState = {
     return actions ? `<div class="inline-entry-actions">${actions}</div>` : "";
   }
 
+  function favoriteItems() {
+    return [...(window.baseModel?.items || []), ...(window.baseModel?.documents || [])]
+      .filter(item => item.recordId && window.appState.favorites.has(favoriteKey(item)))
+      .sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true }));
+  }
+
+  function personalFavoritesSection(items) {
+    if (!window.baseMeta?.favoritesEnabled) return "";
+    return `
+      <details class="home-strip home-strip--violet expectations-strip home-section-accordion personal-home-section" data-accordion-group="home-sections">
+        <summary class="home-strip__heading">
+          <span class="home-strip__icon">${window.BOTSOP_UI.icon("user-round")}</span>
+          <div class="home-strip__heading-copy">
+            <h2>Personal</h2>
+            <p class="home-strip__summary">Your saved guidance and resources.</p>
+          </div>
+          <span class="home-strip__count">${items.length}</span>
+          ${window.BOTSOP_UI.icon("chevron-down", "home-strip__chevron")}
+        </summary>
+        <div class="home-strip__content">
+          <details class="expectation-item personal-favorites-accordion" data-accordion-group="home-entry-personal">
+            <summary>
+              <span class="expectation-item__title"><span class="expectation-item__icon">${window.BOTSOP_UI.icon("star")}</span><strong>Favorites</strong><small>${items.length} saved item${items.length === 1 ? "" : "s"}</small></span>
+              ${window.BOTSOP_UI.icon("chevron-down")}
+            </summary>
+            <div class="expectation-item__body personal-favorites-accordion__body">
+              ${items.length ? processAccordionList(items) : `<section class="empty-state personal-favorites-empty"><h2>No favorites yet</h2><p>Open an SOP or Resource and select Add to Favorites.</p></section>`}
+            </div>
+          </details>
+        </div>
+      </details>
+    `;
+  }
+
   window.BOTSOP_ENTRY_ACTIONS = entryActionButtons;
 
   window.showHome = function showHome(addToHistory = true) {
@@ -175,11 +215,13 @@ window.appState = {
     ]).sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
     const banOperatorsAndReasons = guidanceItemsFor("Ban Operators");
     const warnings = model.section("Warning");
+    const favorites = favoriteItems();
 
     renderAndRefresh(`
       <div class="page-stack">
         ${window.BOTSOP_UI.mappingAlert(model.unmapped)}
         ${window.BOTSOP_UI.updatesCallout(window.baseMeta?.unacknowledgedUpdatesUrl)}
+        ${personalFavoritesSection(favorites)}
         ${window.BOTSOP_UI.guidanceDropdownSection("Out of Scope", "route", outOfScope, "blue", "Routing guidance for work that falls outside BOT scope.")}
         ${window.BOTSOP_UI.guidanceDropdownSection("Ban Operators and Reasons", "shield-check", banOperatorsAndReasons, "orange", "Guidance for selecting ban operators and reason codes.")}
         ${window.BOTSOP_UI.warningCards(warnings)}
@@ -467,6 +509,8 @@ window.appState = {
 
   window.showBackupDocument = function showBackupDocument(addToHistory = true) {
     if (!window.baseModel) return;
+    const standalone = isStandaloneBackup();
+    document.body.classList.toggle("backup-standalone", standalone);
     if (addToHistory) remember("backup", "backup-document");
     else {
       window.appState.currentView = "backup";
@@ -476,10 +520,11 @@ window.appState = {
     window.setActiveNavigation(null);
     renderAndRefresh(`
       <div class="backup-page">
-        <nav class="breadcrumbs backup-page__breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Backup Document</span></nav>
+        ${standalone ? "" : `<nav class="breadcrumbs backup-page__breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="showHome()">Home</button><span>&rsaquo;</span><span>Backup Document</span></nav>`}
         <div class="backup-page__toolbar">
           <div><h2>Current Guidance Document</h2><p>Active guidance only. Resource Hub records appear only when linked to included content.</p></div>
-          <button type="button" class="secondary-action" onclick="downloadBackupDocument()">${window.BOTSOP_UI.icon("download")} Download Copy</button>
+          ${standalone ? `<a class="secondary-action backup-page__back" href="/">${window.BOTSOP_UI.icon("arrow-left")} Back to SOP</a>` : ""}
+          <button type="button" class="secondary-action" onclick="downloadBackupDocument(this)">${window.BOTSOP_UI.icon("download")} Download Copy</button>
           <button type="button" class="primary-action" onclick="window.print()">${window.BOTSOP_UI.icon("printer")} Print / Save PDF</button>
         </div>
         ${buildBackupDocument()}
@@ -487,16 +532,38 @@ window.appState = {
     `);
   };
 
-  window.downloadBackupDocument = function downloadBackupDocument() {
+  window.downloadBackupDocument = async function downloadBackupDocument(button) {
     const source = document.getElementById("backup-document");
     if (!source) return;
+    const originalButton = button?.innerHTML || "";
+    if (button) {
+      button.disabled = true;
+      button.innerHTML = `${window.BOTSOP_UI.icon("loader-circle")} Preparing Copy`;
+      window.BOTSOP_UI.refreshIcons();
+    }
     const copy = source.cloneNode(true);
     copy.querySelectorAll("[data-backup-section]").forEach(section => { section.hidden = false; });
     copy.querySelectorAll("[data-backup-nav]").forEach(link => link.removeAttribute("aria-current"));
-    const sourceImages = source.querySelectorAll("img");
-    copy.querySelectorAll("img").forEach((image, index) => {
-      if (sourceImages[index]?.src) image.src = sourceImages[index].src;
+    const sourceImages = [...source.querySelectorAll("img")];
+    const copyImages = [...copy.querySelectorAll("img")];
+    const blobToDataUrl = blob => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Unable to embed image"));
+      reader.readAsDataURL(blob);
     });
+    await Promise.all(copyImages.map(async (image, index) => {
+      const sourceUrl = sourceImages[index]?.src;
+      if (!sourceUrl) return;
+      try {
+        const response = await fetch(sourceUrl, { credentials: "include" });
+        if (!response.ok) throw new Error(`Image request failed (${response.status})`);
+        image.src = await blobToDataUrl(await response.blob());
+      } catch (error) {
+        console.warn("Backup image could not be embedded", error);
+        image.closest("figure")?.remove();
+      }
+    }));
     const exportStyles = `html{scroll-behavior:smooth}body{margin:0;padding:28px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{display:grid;grid-template-columns:250px minmax(0,900px);gap:28px;max-width:1140px;margin:auto}.backup-document__nav{position:sticky;top:20px;align-self:start;display:grid;gap:4px;max-height:calc(100vh - 40px);padding-right:18px;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid #d9e1ec;scrollbar-width:thin}.backup-document__nav-label{font-size:8pt;font-weight:800;text-transform:uppercase}.backup-document__nav a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid #d9e1ec;border-radius:8px;color:#173e70;text-decoration:none}.backup-document__nav-copy{display:grid;gap:2px}.backup-document__nav-copy strong{font-size:9pt}.backup-document__nav-copy em{color:#65758a;font-size:7.5pt;font-style:normal;line-height:1.3}.backup-document__content{min-width:0}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;flex-wrap:wrap;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-overview-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:24px}.backup-overview-list a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:9px 10px;border:1px solid #d9e1ec;border-radius:8px;text-decoration:none}.backup-overview-list a>span{display:grid;gap:2px}.backup-overview-list a small{color:#65758a;font-size:7.5pt}.backup-overview-list a b{display:inline-grid;min-width:25px;height:25px;place-items:center;border-radius:999px;color:#fff;background:#173e70;font-size:8pt}.backup-section{margin-top:30px;break-before:auto;page-break-before:auto}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:auto;page-break-inside:auto;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}@media print{body{padding:0}.backup-document{display:block;max-width:none}.backup-document__nav{display:none}.backup-section,.backup-entry{break-before:auto;break-inside:auto;page-break-before:auto;page-break-inside:auto}}@media(max-width:720px){.backup-document{grid-template-columns:1fr}.backup-document__nav{position:static;max-height:none;overflow:visible;border-right:0;border-bottom:1px solid #d9e1ec;padding:0 0 14px}.backup-overview-list{grid-template-columns:1fr}}`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}</style></head><body>${copy.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -508,6 +575,11 @@ window.appState = {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (button) {
+      button.disabled = false;
+      button.innerHTML = originalButton;
+      window.BOTSOP_UI.refreshIcons();
+    }
   };
 
   window.goBack = function goBack() {
@@ -571,8 +643,7 @@ window.appState = {
       window.appState.currentSection = "favorites";
     }
     window.setActiveNavigation("favorites");
-    const matches = [...window.baseModel.items, ...window.baseModel.documents]
-      .filter(item => item.recordId && window.appState.favorites.has(favoriteKey(item)));
+    const matches = favoriteItems();
     renderAndRefresh(`
       <div class="page-stack">
         <nav class="breadcrumbs" aria-label="Breadcrumb"><button type="button" onclick="goBack()">${window.BOTSOP_UI.icon("arrow-left")} Back</button><span>&rsaquo;</span><span>My Favorites</span></nav>
@@ -604,6 +675,7 @@ window.appState = {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || "Unable to update favorites");
       if (window.appState.currentView === "favorites" && removing) window.showFavorites(false);
+      if (window.appState.currentView === "home") window.showHome(false);
     } catch (error) {
       if (removing) window.appState.favorites.add(key);
       else window.appState.favorites.delete(key);
@@ -672,12 +744,15 @@ window.appState = {
         body: JSON.stringify({ recordId: item.recordId, recordType: item.sourceType === "Documentation" ? "Resource" : "SOP" })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || "Unable to send this entry");
+      if (!response.ok) {
+        const detail = [payload.error, payload.reason, payload.feishuCode ? `Feishu code ${payload.feishuCode}` : ""].filter(Boolean).join(": ");
+        throw new Error(detail || "Unable to send this entry");
+      }
       if (button) {
         button.classList.add("is-sent");
         button.setAttribute("aria-label", "Sent to Feishu");
         button.title = "Sent to Feishu";
-        button.innerHTML = `${window.BOTSOP_UI.icon("check")}<span class="entry-action-label">Sent to Feishu</span>`;
+        button.innerHTML = `${window.BOTSOP_UI.icon("check")}<span class="entry-action-label">${payload.deliveryFormat === "text" ? "Sent in basic format" : "Sent to Feishu"}</span>`;
       }
     } catch (error) {
       if (button) {
@@ -686,6 +761,7 @@ window.appState = {
         button.innerHTML = `${window.BOTSOP_UI.icon("triangle-alert")}<span class="entry-action-label">Send failed</span>`;
         button.title = error.message;
       }
+      window.alert(`Send to Me failed: ${error.message}`);
     } finally {
       if (button) {
         button.disabled = false;
@@ -697,7 +773,7 @@ window.appState = {
           button.setAttribute("aria-label", "Send to Me");
           button.title = "Send to Me";
           window.BOTSOP_UI.refreshIcons();
-        }, 2500);
+        }, 5000);
       }
     }
   };
@@ -833,11 +909,15 @@ window.appState = {
 
   async function initializeApp() {
     try {
+      const standaloneBackup = isStandaloneBackup();
+      document.body.classList.toggle("backup-standalone", standaloneBackup);
       const accessPromise = window.BOTSOP_SUBMISSIONS?.loadAccess?.();
       await window.baseDataReady;
       await Promise.all([loadFavorites(), accessPromise]);
-      window.buildLeftNavigation();
-      window.BOTSOP_UI.renderRightRail(window.baseModel);
+      if (!standaloneBackup) {
+        window.buildLeftNavigation();
+        window.BOTSOP_UI.renderRightRail(window.baseModel);
+      }
       window.BOTSOP_UI.installImageViewer();
       if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
       installCombinedSearch();
@@ -847,6 +927,8 @@ window.appState = {
       const assistant = document.getElementById("agent-assistant");
       if (assistant && window.baseMeta?.agentAssistantUrl) {
         assistant.href = window.baseMeta.agentAssistantUrl;
+        assistant.target = "_blank";
+        assistant.rel = "noopener noreferrer";
         assistant.hidden = false;
       }
       const submitResource = document.getElementById("submit-resource");
@@ -861,7 +943,7 @@ window.appState = {
         submitResource.rel = "noopener noreferrer";
         submitResource.hidden = false;
       }
-      const requestedPage = new URLSearchParams(window.location.search).get("page");
+      const requestedPage = standaloneBackup ? "backup" : new URLSearchParams(window.location.search).get("page");
       const requestedRecord = new URLSearchParams(window.location.search).get("record");
       if (requestedPage === "backup") {
         window.showBackupDocument(false);
