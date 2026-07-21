@@ -21,6 +21,68 @@ window.appState = {
     return path === "/backup" || (params.get("page") === "backup" && params.get("standalone") === "1");
   }
 
+  function isQuickMobile() {
+    return document.documentElement.classList.contains("quick-mobile");
+  }
+
+  window.focusQuickSearch = function focusQuickSearch() {
+    const input = document.querySelector(".header-search input");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    input?.focus({ preventScroll: true });
+  };
+
+  function mobileQuickHome(favorites, outOfScope) {
+    const categories = (window.baseModel?.requestTypes || []).slice(0, 8);
+    const favoriteRows = favorites.slice(0, 5).map(item => `
+      <button type="button" class="mobile-quick-row" onclick="showRecord('${window.BOTSOP_UI.escape(item.id)}')">
+        <span>${window.BOTSOP_UI.icon(item.icon || "star")}</span>
+        <strong>${window.BOTSOP_UI.escape(item.title)}</strong>
+        ${window.BOTSOP_UI.icon("chevron-right")}
+      </button>
+    `).join("");
+
+    return `
+      <div class="mobile-quick-home">
+        <section class="mobile-search-prompt">
+          <span class="mobile-search-prompt__icon">${window.BOTSOP_UI.icon("search")}</span>
+          <div><h1>Find guidance fast</h1><p>Search SOPs, ticket guidance, tools, and Resource Hub entries.</p></div>
+          <button type="button" onclick="window.focusQuickSearch()">Start searching</button>
+        </section>
+
+        <section class="mobile-quick-section">
+          <header><div><span>Browse</span><h2>Guidance categories</h2></div></header>
+          <div class="mobile-category-grid">
+            ${categories.map(item => `
+              <button type="button" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
+                ${window.BOTSOP_UI.icon(item.icon || "folder")}
+                <span>${window.BOTSOP_UI.escape(item.title)}</span>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+
+        ${favorites.length ? `
+          <section class="mobile-quick-section">
+            <header><div><span>Personal</span><h2>Favorites</h2></div><button type="button" onclick="showFavorites()">View all</button></header>
+            <div class="mobile-quick-list">${favoriteRows}</div>
+          </section>
+        ` : ""}
+
+        ${outOfScope.length ? `
+          <button type="button" class="mobile-oos-shortcut" onclick="showOosRouting()">
+            <span>${window.BOTSOP_UI.icon("route")}</span>
+            <span><strong>OOS Routing</strong><small>Open quick routing guidance</small></span>
+            ${window.BOTSOP_UI.icon("chevron-right")}
+          </button>
+        ` : ""}
+
+        <a class="mobile-full-site-link" href="?desktop=1" target="_blank" rel="noopener noreferrer">
+          ${window.BOTSOP_UI.icon("external-link")} Open the full BOT SOP
+        </a>
+      </div>
+    `;
+  }
+
   function renderAndRefresh(html) {
     const target = contentView();
     if (!target) return;
@@ -216,6 +278,11 @@ window.appState = {
     const banOperatorsAndReasons = guidanceItemsFor("Ban Operators");
     const warnings = model.section("Warning");
     const favorites = favoriteItems();
+
+    if (isQuickMobile()) {
+      renderAndRefresh(mobileQuickHome(favorites, outOfScope));
+      return;
+    }
 
     renderAndRefresh(`
       <div class="page-stack">
@@ -930,6 +997,11 @@ window.appState = {
         assistant.target = "_blank";
         assistant.rel = "noopener noreferrer";
         assistant.hidden = false;
+      }
+      const mobileAssistant = document.getElementById("mobile-agent-assistant");
+      if (mobileAssistant && window.baseMeta?.agentAssistantUrl) {
+        mobileAssistant.href = window.baseMeta.agentAssistantUrl;
+        mobileAssistant.hidden = false;
       }
       const submitResource = document.getElementById("submit-resource");
       if (submitResource && window.BOTSOP_SUBMISSIONS?.hasAnyAccess?.()) {
