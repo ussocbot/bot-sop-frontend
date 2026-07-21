@@ -1,15 +1,15 @@
-const CACHE_NAME = "bot-sop-static-v18-13";
+const CACHE_NAME = "bot-sop-static-v18-14";
 const STATIC_ASSETS = [
   "/",
   "/index.html",
   "/signed-out.html",
-  "/css/styles.css?v=2026.07.21-v18.13",
-  "/js/data.js?v=2026.07.21-v18.13",
-  "/js/components.js?v=2026.07.21-v18.13",
-  "/js/navigation.js?v=2026.07.21-v18.13",
-  "/js/reviews.js?v=2026.07.21-v18.13",
-  "/js/submissions.js?v=2026.07.21-v18.13",
-  "/js/app.js?v=2026.07.21-v18.13",
+  "/css/styles.css?v=2026.07.21-v18.14",
+  "/js/data.js?v=2026.07.21-v18.14",
+  "/js/components.js?v=2026.07.21-v18.14",
+  "/js/navigation.js?v=2026.07.21-v18.14",
+  "/js/reviews.js?v=2026.07.21-v18.14",
+  "/js/submissions.js?v=2026.07.21-v18.14",
+  "/js/app.js?v=2026.07.21-v18.14",
   "/vendor/lucide.min.js?v=0.468.0",
   "/assets/gear-favicon.svg"
 ];
