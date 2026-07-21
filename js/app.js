@@ -408,8 +408,18 @@ window.appState = {
 
     const generatedAt = new Date().toLocaleString([], { dateStyle: "long", timeStyle: "short" });
     const navItems = [
-      { id: "overview", title: "Overview", count: includedItems.length },
-      ...sections.map(section => ({ id: section.id, title: section.title, count: section.items.length }))
+      {
+        id: "overview",
+        title: "Current Guidance Overview",
+        summary: "Directory of every active section in this copy.",
+        count: includedItems.length
+      },
+      ...sections.map(section => ({
+        id: section.id,
+        title: section.title,
+        summary: section.summary || "Current active guidance.",
+        count: section.items.length
+      }))
     ];
     return `
       <article class="backup-document" id="backup-document">
@@ -417,7 +427,11 @@ window.appState = {
           <span class="backup-document__nav-label">Current Guidance</span>
           ${navItems.map((item, index) => `
             <a href="#backup-${window.BOTSOP_UI.escape(item.id)}" data-backup-nav="${window.BOTSOP_UI.escape(item.id)}" aria-current="${index === 0 ? "page" : "false"}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(item.id)}')}">
-              <span>${window.BOTSOP_UI.escape(item.title)}</span><small>${item.count}</small>
+              <span class="backup-document__nav-copy">
+                <strong>${window.BOTSOP_UI.escape(item.title)}</strong>
+                <em>${window.BOTSOP_UI.escape(item.summary)}</em>
+              </span>
+              <small aria-label="${item.count} active entries">${item.count}</small>
             </a>
           `).join("")}
         </aside>
@@ -428,7 +442,7 @@ window.appState = {
             <p>A focused copy containing only active guidance and the Resource Hub items linked directly to it.</p>
             <dl><div><dt>Generated</dt><dd>${window.BOTSOP_UI.escape(generatedAt)}</dd></div><div><dt>Active guidance</dt><dd>${includedItems.length}</dd></div><div><dt>Linked resources</dt><dd>${linkedResources.size}</dd></div><div><dt>Sections</dt><dd>${sections.length}</dd></div></dl>
             <div class="backup-overview-list">
-              ${sections.map(section => `<a href="#backup-${window.BOTSOP_UI.escape(section.id)}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(section.id)}')}"><span>${window.BOTSOP_UI.escape(section.title)}</span><strong>${section.items.length}</strong></a>`).join("")}
+              ${sections.map(section => `<a href="#backup-${window.BOTSOP_UI.escape(section.id)}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(section.id)}')}"><span><strong>${window.BOTSOP_UI.escape(section.title)}</strong><small>${window.BOTSOP_UI.escape(section.summary || "Current active guidance.")}</small></span><b aria-label="${section.items.length} active entries">${section.items.length}</b></a>`).join("")}
             </div>
           </header>
           ${sections.map(section => backupSection(section.id, section.title, section.items, section.summary)).join("")}
@@ -483,7 +497,7 @@ window.appState = {
     copy.querySelectorAll("img").forEach((image, index) => {
       if (sourceImages[index]?.src) image.src = sourceImages[index].src;
     });
-    const exportStyles = `html{scroll-behavior:smooth}body{margin:0;padding:28px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{display:grid;grid-template-columns:210px minmax(0,900px);gap:28px;max-width:1140px;margin:auto}.backup-document__nav{position:sticky;top:20px;align-self:start;display:grid;gap:4px;max-height:calc(100vh - 40px);padding-right:18px;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid #d9e1ec;scrollbar-width:thin}.backup-document__nav-label{font-size:8pt;font-weight:800;text-transform:uppercase}.backup-document__nav a{display:flex;justify-content:space-between;gap:10px;padding:7px 8px;color:#173e70;text-decoration:none}.backup-document__content{min-width:0}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;flex-wrap:wrap;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-overview-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:24px}.backup-overview-list a{display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #d9e1ec;text-decoration:none}.backup-section{margin-top:30px;break-before:auto;page-break-before:auto}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:auto;page-break-inside:auto;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}@media print{body{padding:0}.backup-document{display:block;max-width:none}.backup-document__nav{display:none}.backup-section,.backup-entry{break-before:auto;break-inside:auto;page-break-before:auto;page-break-inside:auto}}@media(max-width:720px){.backup-document{grid-template-columns:1fr}.backup-document__nav{position:static;max-height:none;overflow:visible;border-right:0;border-bottom:1px solid #d9e1ec;padding:0 0 14px}.backup-overview-list{grid-template-columns:1fr}}`;
+    const exportStyles = `html{scroll-behavior:smooth}body{margin:0;padding:28px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{display:grid;grid-template-columns:250px minmax(0,900px);gap:28px;max-width:1140px;margin:auto}.backup-document__nav{position:sticky;top:20px;align-self:start;display:grid;gap:4px;max-height:calc(100vh - 40px);padding-right:18px;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid #d9e1ec;scrollbar-width:thin}.backup-document__nav-label{font-size:8pt;font-weight:800;text-transform:uppercase}.backup-document__nav a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid #d9e1ec;border-radius:8px;color:#173e70;text-decoration:none}.backup-document__nav-copy{display:grid;gap:2px}.backup-document__nav-copy strong{font-size:9pt}.backup-document__nav-copy em{color:#65758a;font-size:7.5pt;font-style:normal;line-height:1.3}.backup-document__content{min-width:0}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;flex-wrap:wrap;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-overview-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:24px}.backup-overview-list a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:9px 10px;border:1px solid #d9e1ec;border-radius:8px;text-decoration:none}.backup-overview-list a>span{display:grid;gap:2px}.backup-overview-list a small{color:#65758a;font-size:7.5pt}.backup-overview-list a b{display:inline-grid;min-width:25px;height:25px;place-items:center;border-radius:999px;color:#fff;background:#173e70;font-size:8pt}.backup-section{margin-top:30px;break-before:auto;page-break-before:auto}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:auto;page-break-inside:auto;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}@media print{body{padding:0}.backup-document{display:block;max-width:none}.backup-document__nav{display:none}.backup-section,.backup-entry{break-before:auto;break-inside:auto;page-break-before:auto;page-break-inside:auto}}@media(max-width:720px){.backup-document{grid-template-columns:1fr}.backup-document__nav{position:static;max-height:none;overflow:visible;border-right:0;border-bottom:1px solid #d9e1ec;padding:0 0 14px}.backup-overview-list{grid-template-columns:1fr}}`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}</style></head><body>${copy.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
