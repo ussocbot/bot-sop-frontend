@@ -7,13 +7,21 @@
   <title>BOT SOP</title>
   <link rel="icon" type="image/svg+xml" href="assets/gear-favicon.svg">
   <link rel="shortcut icon" href="assets/gear-favicon.svg">
-  <link rel="stylesheet" href="css/styles.css?v=2026.07.21-v18.17">
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var compact = params.get("mobile") === "1" ||
+        (params.get("desktop") !== "1" && window.matchMedia("(max-width: 640px)").matches);
+      document.documentElement.classList.toggle("quick-mobile", compact);
+    })();
+  </script>
+  <link rel="stylesheet" href="css/styles.css?v=2026.07.21-v19.0">
 </head>
 <body>
   <header class="app-header">
     <button class="brand" type="button" onclick="showHome()" aria-label="BOT SOP home">
       <span class="brand__mark"><i data-lucide="settings"></i></span>
-      <span><strong>BOT SOP</strong><small>Operational Guidance Center</small></span>
+      <span><strong>BOT SOP</strong><small>Operational Guidance Center</small><em class="mobile-mode-label">Quick Search</em></span>
     </button>
 
     <div class="search-cluster">
@@ -61,7 +69,7 @@
 
     <div class="header-actions">
       <a id="submit-resource" class="submit-resource-button header-outline-button" href="#" hidden><i data-lucide="circle-plus"></i><span>Submission Center</span></a>
-      <span class="build-version" title="Deployment build">Build 2026.07.21-v18.17</span>
+      <span class="build-version" title="Deployment build">Build 2026.07.21-v19.0</span>
       <span class="signed-in"><i data-lucide="user-round"></i><span id="signed-in-user">Feishu user</span></span>
       <a id="sign-out-button" class="sign-out-button header-outline-button" href="/api/auth/logout"><i data-lucide="log-out"></i><span>Sign out</span></a>
     </div>
@@ -75,13 +83,20 @@
     <aside id="right-rail" class="right-sidebar" aria-label="Resources and updates"></aside>
   </div>
 
+  <nav class="mobile-quick-nav" aria-label="Quick navigation">
+    <button type="button" onclick="showHome()"><i data-lucide="home"></i><span>Home</span></button>
+    <button type="button" onclick="window.focusQuickSearch?.()"><i data-lucide="search"></i><span>Search</span></button>
+    <button type="button" onclick="showFavorites()"><i data-lucide="star"></i><span>Favorites</span></button>
+    <a id="mobile-agent-assistant" href="#" target="_blank" rel="noopener noreferrer" hidden><i data-lucide="bot"></i><span>Assistant</span></a>
+  </nav>
+
   <script src="vendor/lucide.min.js?v=0.468.0"></script>
-  <script src="js/data.js?v=2026.07.21-v18.17"></script>
-  <script src="js/components.js?v=2026.07.21-v18.17"></script>
-  <script src="js/navigation.js?v=2026.07.21-v18.17"></script>
-  <script src="js/reviews.js?v=2026.07.21-v18.17"></script>
-  <script src="js/submissions.js?v=2026.07.21-v18.17"></script>
-  <script src="js/app.js?v=2026.07.21-v18.17"></script>
+  <script src="js/data.js?v=2026.07.21-v19.0"></script>
+  <script src="js/components.js?v=2026.07.21-v19.0"></script>
+  <script src="js/navigation.js?v=2026.07.21-v19.0"></script>
+  <script src="js/reviews.js?v=2026.07.21-v19.0"></script>
+  <script src="js/submissions.js?v=2026.07.21-v19.0"></script>
+  <script src="js/app.js?v=2026.07.21-v19.0"></script>
   <script>
     document.getElementById("sign-out-button")?.addEventListener("click", function () {
       if (this.classList.contains("is-signing-out")) return;
