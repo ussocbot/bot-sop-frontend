@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/api/auth/login", "destination": "/api/auth-handler?action=login" },
+    { "source": "/api/auth/callback", "destination": "/api/auth-handler?action=callback" },
+    { "source": "/api/auth/logout", "destination": "/api/auth-handler?action=logout" },
+    { "source": "/api/favorites", "destination": "/api/user-actions?action=favorites" },
+    { "source": "/api/send-to-me", "destination": "/api/user-actions?action=send-to-me" },
+    { "source": "/api/submission-access", "destination": "/api/submission-center?action=access" },
+    { "source": "/api/submission-upload", "destination": "/api/submission-center?action=upload" },
+    { "source": "/api/submissions", "destination": "/api/submission-center?action=submit" },
+    { "source": "/api/review-requests", "destination": "/api/submission-center?action=reviews" },
+    { "source": "/api/apply-approved-update", "destination": "/api/submission-center?action=apply" }
+  ]
+}
