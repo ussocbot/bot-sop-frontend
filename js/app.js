@@ -31,8 +31,19 @@ window.appState = {
     input?.focus({ preventScroll: true });
   };
 
-  function mobileQuickHome(favorites, outOfScope) {
-    const categories = (window.baseModel?.requestTypes || []).slice(0, 8);
+  window.toggleMobileCategories = function toggleMobileCategories(button) {
+    const section = button?.closest(".mobile-quick-section");
+    if (!section) return;
+    const expanded = button.getAttribute("aria-expanded") === "true";
+    section.querySelectorAll(".mobile-category-extra").forEach(item => {
+      item.hidden = expanded;
+    });
+    button.setAttribute("aria-expanded", String(!expanded));
+    button.textContent = expanded ? "View all" : "Show less";
+  };
+
+  function mobileQuickHome(favorites, outOfScope, updatePanels) {
+    const categories = window.baseModel?.requestTypes || [];
     const favoriteRows = favorites.slice(0, 5).map(item => `
       <button type="button" class="mobile-quick-row" onclick="showRecord('${window.BOTSOP_UI.escape(item.id)}')">
         <span>${window.BOTSOP_UI.icon(item.icon || "star")}</span>
@@ -50,10 +61,10 @@ window.appState = {
         </section>
 
         <section class="mobile-quick-section">
-          <header><div><span>Browse</span><h2>Guidance categories</h2></div></header>
+          <header><div><span>Browse</span><h2>Guidance categories</h2></div>${categories.length > 8 ? `<button type="button" aria-expanded="false" onclick="toggleMobileCategories(this)">View all</button>` : ""}</header>
           <div class="mobile-category-grid">
-            ${categories.map(item => `
-              <button type="button" onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
+            ${categories.map((item, index) => `
+              <button type="button" class="${index >= 8 ? "mobile-category-extra" : ""}" ${index >= 8 ? "hidden" : ""} onclick="showSection('${window.BOTSOP_UI.escape(item.id)}')">
                 ${window.BOTSOP_UI.icon(item.icon || "folder")}
                 <span>${window.BOTSOP_UI.escape(item.title)}</span>
               </button>
@@ -67,6 +78,19 @@ window.appState = {
             <div class="mobile-quick-list">${favoriteRows}</div>
           </section>
         ` : ""}
+
+        <section class="mobile-updates-grid" aria-label="Updates and news">
+          <button type="button" class="mobile-update-shortcut mobile-update-shortcut--news" onclick="showUpdateArchive('important-news')">
+            <span>${window.BOTSOP_UI.icon("megaphone")}</span>
+            <span><strong>Important News</strong><small>${updatePanels.news} active update${updatePanels.news === 1 ? "" : "s"}</small></span>
+            ${window.BOTSOP_UI.icon("chevron-right")}
+          </button>
+          <button type="button" class="mobile-update-shortcut mobile-update-shortcut--sop" onclick="showUpdateArchive('sop-updates')">
+            <span>${window.BOTSOP_UI.icon("file-clock")}</span>
+            <span><strong>SOP Updates</strong><small>${updatePanels.sop} active update${updatePanels.sop === 1 ? "" : "s"}</small></span>
+            ${window.BOTSOP_UI.icon("chevron-right")}
+          </button>
+        </section>
 
         ${outOfScope.length ? `
           <button type="button" class="mobile-oos-shortcut" onclick="showOosRouting()">
@@ -280,7 +304,9 @@ window.appState = {
     const favorites = favoriteItems();
 
     if (isQuickMobile()) {
-      renderAndRefresh(mobileQuickHome(favorites, outOfScope));
+      const news = uniqueItems([...model.featuredFor("Important News"), ...model.section("Important News")]);
+      const sopUpdates = uniqueItems([...model.featuredFor("SOP Updates"), ...model.section("SOP Updates")]);
+      renderAndRefresh(mobileQuickHome(favorites, outOfScope, { news: news.length, sop: sopUpdates.length }));
       return;
     }
 
