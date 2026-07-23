@@ -451,14 +451,27 @@ window.appState = {
     `);
   };
 
-  function backupEntry(item) {
+  function backupAnchor(value) {
+    return String(value || "entry")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "entry";
+  }
+
+  function backupEntryId(sectionId, item, index) {
+    return `backup-entry-${backupAnchor(sectionId)}-${backupAnchor(item.id || item.recordKey || item.title)}-${index + 1}`;
+  }
+
+  function backupEntry(item, sectionId, index) {
     const relatedResources = (item.relatedResources || []).filter(entry => entry?.url);
     const linkedTasks = (item.linkedTasks || []).filter(entry => entry?.title && !entry.unresolved);
     const resourceName = String(item.ctaLabel || "").trim().toLowerCase() === "open resource"
       ? item.title
       : (item.ctaLabel || item.title || item.url);
+    const entryId = backupEntryId(sectionId, item, index);
     return `
-      <section class="backup-entry">
+      <section class="backup-entry" id="${window.BOTSOP_UI.escape(entryId)}" tabindex="-1">
         <h3>${window.BOTSOP_UI.escape(item.title)}</h3>
         <div class="backup-entry__meta">
           ${item.displayType ? `<span>${window.BOTSOP_UI.escape(item.displayType)}</span>` : ""}
@@ -480,10 +493,10 @@ window.appState = {
   function backupSection(id, title, items, summary = "") {
     if (!items.length) return "";
     return `
-      <section class="backup-section backup-document__panel" id="backup-${window.BOTSOP_UI.escape(id)}" data-backup-section="${window.BOTSOP_UI.escape(id)}" hidden>
+      <section class="backup-section backup-document__panel" id="backup-${window.BOTSOP_UI.escape(id)}" data-backup-section="${window.BOTSOP_UI.escape(id)}" tabindex="-1">
         <h2>${window.BOTSOP_UI.escape(title)}</h2>
         ${summary ? `<p class="backup-section__summary">${window.BOTSOP_UI.escape(summary)}</p>` : ""}
-        ${items.map(backupEntry).join("")}
+        ${items.map((item, index) => backupEntry(item, id, index)).join("")}
       </section>
     `;
   }
@@ -542,32 +555,33 @@ window.appState = {
     });
 
     const generatedAt = new Date().toLocaleString([], { dateStyle: "long", timeStyle: "short" });
-    const navItems = [
-      {
-        id: "overview",
-        title: "Current Guidance Overview",
-        summary: "Directory of every active section in this copy.",
-        count: includedItems.length
-      },
-      ...sections.map(section => ({
-        id: section.id,
-        title: section.title,
-        summary: section.summary || "Current active guidance.",
-        count: section.items.length
-      }))
-    ];
     return `
       <article class="backup-document" id="backup-document">
         <aside class="backup-document__nav" aria-label="Backup document sections">
           <span class="backup-document__nav-label">Current Guidance</span>
-          ${navItems.map((item, index) => `
-            <a href="#backup-${window.BOTSOP_UI.escape(item.id)}" data-backup-nav="${window.BOTSOP_UI.escape(item.id)}" aria-current="${index === 0 ? "page" : "false"}" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(item.id)}')}">
-              <span class="backup-document__nav-copy">
-                <strong>${window.BOTSOP_UI.escape(item.title)}</strong>
-                <em>${window.BOTSOP_UI.escape(item.summary)}</em>
-              </span>
-              <small aria-label="${item.count} active entries">${item.count}</small>
-            </a>
+          <a class="backup-document__nav-section" href="#backup-overview" data-backup-nav="overview" aria-current="page" onclick="if(window.showBackupSection){return window.showBackupSection(event, 'overview')}">
+            <span class="backup-document__nav-copy">
+              <strong>Current Guidance Overview</strong>
+              <em>Directory of every active section in this copy.</em>
+            </span>
+            <small aria-label="${includedItems.length} active entries">${includedItems.length}</small>
+          </a>
+          ${sections.map(section => `
+            <div class="backup-document__nav-group">
+              <a class="backup-document__nav-section" href="#backup-${window.BOTSOP_UI.escape(section.id)}" data-backup-nav="${window.BOTSOP_UI.escape(section.id)}" aria-current="false" onclick="if(window.showBackupSection){return window.showBackupSection(event, '${window.BOTSOP_UI.escape(section.id)}')}">
+                <span class="backup-document__nav-copy">
+                  <strong>${window.BOTSOP_UI.escape(section.title)}</strong>
+                  <em>${window.BOTSOP_UI.escape(section.summary || "Current active guidance.")}</em>
+                </span>
+                <small aria-label="${section.items.length} active entries">${section.items.length}</small>
+              </a>
+              <div class="backup-document__nav-entries" aria-label="${window.BOTSOP_UI.escape(section.title)} entries">
+                ${section.items.map((entry, index) => {
+                  const entryId = backupEntryId(section.id, entry, index);
+                  return `<a class="backup-document__nav-entry" href="#${window.BOTSOP_UI.escape(entryId)}" onclick="if(window.showBackupEntry){return window.showBackupEntry(event, '${window.BOTSOP_UI.escape(entryId)}', '${window.BOTSOP_UI.escape(section.id)}')}">${window.BOTSOP_UI.escape(entry.title)}</a>`;
+                }).join("")}
+              </div>
+            </div>
           `).join("")}
         </aside>
         <div class="backup-document__content">
@@ -590,13 +604,31 @@ window.appState = {
     if (event?.preventDefault) event.preventDefault();
     const documentRoot = document.getElementById("backup-document");
     if (!documentRoot) return false;
-    documentRoot.querySelectorAll("[data-backup-section]").forEach(section => {
-      section.hidden = section.dataset.backupSection !== sectionId;
-    });
     documentRoot.querySelectorAll("[data-backup-nav]").forEach(link => {
       link.setAttribute("aria-current", link.dataset.backupNav === sectionId ? "page" : "false");
     });
-    documentRoot.scrollIntoView({ block: "start", behavior: "smooth" });
+    const target = sectionId === "overview"
+      ? documentRoot.querySelector("#backup-overview")
+      : document.getElementById(`backup-${sectionId}`);
+    target?.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (target && typeof target.focus === "function") {
+      window.setTimeout(() => target.focus({ preventScroll: true }), 350);
+    }
+    return false;
+  };
+
+  window.showBackupEntry = function showBackupEntry(event, entryId, sectionId) {
+    if (event?.preventDefault) event.preventDefault();
+    const documentRoot = document.getElementById("backup-document");
+    if (!documentRoot) return false;
+    documentRoot.querySelectorAll("[data-backup-nav]").forEach(link => {
+      link.setAttribute("aria-current", link.dataset.backupNav === sectionId ? "page" : "false");
+    });
+    const target = document.getElementById(entryId);
+    target?.scrollIntoView({ block: "start", behavior: "smooth" });
+    if (target && typeof target.focus === "function") {
+      window.setTimeout(() => target.focus({ preventScroll: true }), 350);
+    }
     return false;
   };
 
@@ -658,7 +690,8 @@ window.appState = {
       }
     }));
     const exportStyles = `html{scroll-behavior:smooth}body{margin:0;padding:28px;color:#17233b;font:11pt/1.55 Arial,sans-serif}a{color:#075ee8}.backup-document{display:grid;grid-template-columns:250px minmax(0,900px);gap:28px;max-width:1140px;margin:auto}.backup-document__nav{position:sticky;top:20px;align-self:start;display:grid;gap:4px;max-height:calc(100vh - 40px);padding-right:18px;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid #d9e1ec;scrollbar-width:thin}.backup-document__nav-label{font-size:8pt;font-weight:800;text-transform:uppercase}.backup-document__nav a{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid #d9e1ec;border-radius:8px;color:#173e70;text-decoration:none}.backup-document__nav-copy{display:grid;gap:2px}.backup-document__nav-copy strong{font-size:9pt}.backup-document__nav-copy em{color:#65758a;font-size:7.5pt;font-style:normal;line-height:1.3}.backup-document__content{min-width:0}.backup-document__cover{padding:32px 0;border-bottom:3px solid #173e70}.backup-document__cover h1{font-size:28pt;margin:8px 0}.backup-document__mark{font-weight:800;color:#173e70}.backup-document__cover dl{display:flex;flex-wrap:wrap;gap:24px}.backup-document__cover dt{font-size:8pt;text-transform:uppercase}.backup-document__cover dd{margin:2px 0;font-weight:700}.backup-overview-list{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:24px}.backup-overview-list a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px;padding:9px 10px;border:1px solid #d9e1ec;border-radius:8px;text-decoration:none}.backup-overview-list a>span{display:grid;gap:2px}.backup-overview-list a small{color:#65758a;font-size:7.5pt}.backup-overview-list a b{display:inline-grid;min-width:25px;height:25px;place-items:center;border-radius:999px;color:#fff;background:#173e70;font-size:8pt}.backup-section{margin-top:30px;break-before:auto;page-break-before:auto}.backup-section>h2{padding-bottom:6px;border-bottom:2px solid #9bb6d7;color:#173e70}.backup-entry{break-inside:auto;page-break-inside:auto;margin:18px 0;padding-bottom:18px;border-bottom:1px solid #d9e1ec}.backup-entry h3{font-size:15pt;margin:0 0 6px}.backup-entry__meta{display:flex;gap:8px;flex-wrap:wrap;color:#5d6d82;font-size:8.5pt}.backup-entry__summary{font-weight:700}.backup-entry__images{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.backup-entry__images img{max-width:100%;max-height:420px}.backup-entry__images figure{margin:0}.backup-entry__images figcaption{font-size:8pt;color:#5d6d82}h3{page-break-after:avoid}ul{padding-left:20px}@media print{body{padding:0}.backup-document{display:block;max-width:none}.backup-document__nav{display:none}.backup-section,.backup-entry{break-before:auto;break-inside:auto;page-break-before:auto;page-break-inside:auto}}@media(max-width:720px){.backup-document{grid-template-columns:1fr}.backup-document__nav{position:static;max-height:none;overflow:visible;border-right:0;border-bottom:1px solid #d9e1ec;padding:0 0 14px}.backup-overview-list{grid-template-columns:1fr}}`;
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}</style></head><body>${copy.outerHTML}</body></html>`;
+    const exportNestedNavStyles = `.backup-document__nav-group{display:grid;gap:2px}.backup-document__nav-entries{display:grid;gap:1px;margin:0 0 7px 11px;padding-left:10px;border-left:2px solid #dce5ef}.backup-document__nav a.backup-document__nav-entry{display:block;padding:5px 7px;border:0;border-radius:6px;color:#52637a;background:transparent;font-size:7.5pt;font-weight:650;line-height:1.3;overflow-wrap:anywhere}.backup-document__nav a.backup-document__nav-entry:hover{color:#173e70;background:#eef4fb}.backup-section,.backup-entry{scroll-margin-top:20px}`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>BOT SOP Backup</title><style>${exportStyles}${exportNestedNavStyles}</style></head><body>${copy.outerHTML}</body></html>`;
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
